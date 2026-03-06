@@ -1,0 +1,26 @@
+{
+  "extends": "stylelint-config-standard",
+  "plugins": ["stylelint-declaration-strict-value"],
+  "rules": {
+    "scale-unlimited/declaration-strict-value": [
+      ["/color/", "z-index", "font-size", "padding", "margin"],
+      {
+        "ignoreValues": [
+          "currentColor",
+          "inherit",
+          "transparent",
+          "none",
+          "0",
+          "auto",
+          "100%",
+          "white",
+          "black"
+        ],
+        "expandShorthand": true,
+        "message": "Please use a design token (variable) for \"{property}\" instead of \"{value}\"."
+      }
+    ],
+    "selector-class-pattern": null,
+    "custom-property-pattern": null
+  }
+}
