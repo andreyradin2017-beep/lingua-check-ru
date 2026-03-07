@@ -110,3 +110,35 @@ Response:
 - `visual_weight_foreign`: float | null
 - `visual_weight_rus`: float | null
 - `details`: object (произвольные поля: selector, css, screenshot_path, etc.)
+
+---
+
+## 5. Товарные знаки
+
+### GET `/api/v1/trademarks`
+
+Получить список всех зарегистрированных брендов.
+
+Response (JSON):
+
+- `List[Trademark]`
+
+### POST `/api/v1/trademarks`
+
+Добавить новый бренд. При добавлении слово автоматически нормализуется.
+
+Request (JSON):
+
+- `word`: string, required
+
+Response (JSON):
+
+- `id`: string (uuid)
+- `word`: string
+- `normal_form`: string
+
+### DELETE `/api/v1/trademarks/{id}`
+
+Удалить бренд из списка исключений.
+
+Response: `204 No Content`

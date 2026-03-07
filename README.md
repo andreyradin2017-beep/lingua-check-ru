@@ -26,7 +26,7 @@
 
 ## Технологический стек
 
-- **Backend**: FastAPI, SQLAlchemy (PostgreSQL/SQLite), Playwright (скрапинг), Pymorphy3.
+- **Backend**: FastAPI, SQLAlchemy (PostgreSQL/SQLite), Supabase (REST API + JSON API), Playwright (скрапинг), Pymorphy3.
 - **Frontend**: React, Mantine UI, Tabler Icons.
 - **Data**: Обработка PDF словарей через `pdfminer.six`.
 
@@ -48,8 +48,15 @@
 
 ### Импорт словарей
 
-Для наполнения базы используйте скрипт:
-`python scripts/import_dictionaries.py "путь_к_pdf" --dictionary-name [Orthographic|ForeignWords|Explanatory|Orthoepic] --version "2024"`
+Для стабильного импорта данных используйте двухэтапный процесс:
+
+1. **Парсинг PDF в кэш (JSON)**:
+   `python scripts/parse_pdf.py "путь_к_pdf" --dictionary-name [Orthographic|ForeignWords|Explanatory|Orthoepic] --version "2024" --output cache/dict.json`
+
+2. **Загрузка в Supabase**:
+   `python scripts/upload_rest.py cache/dict.json`
+
+Скрипты используют прямое соединение с REST API для обхода ограничений пулеров соединений.
 
 ## Лицензия
 
