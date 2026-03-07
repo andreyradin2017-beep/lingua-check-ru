@@ -1,14 +1,14 @@
-import { useState, useMemo, useEffect } from 'react';
-import { Title, Stack, Group, SimpleGrid, Badge, Text, TextInput, NumberInput, Paper, Table, Progress, Alert, Button, Modal, Image, Pagination, Checkbox, UnstyledButton, Center, MultiSelect, Box, Code } from '@mantine/core';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Title, Stack, Group, SimpleGrid, Badge, Text, TextInput, NumberInput, Paper, Table, Progress, Alert, Button, Modal, Image, Pagination, Checkbox, UnstyledButton, Center, MultiSelect, Box, Code, Collapse } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconSearch, IconAlertTriangle, IconCheck, IconExternalLink, IconPhoto, IconFileSpreadsheet, IconFileTypePdf, IconFilter, IconX, IconBookmark, IconTrash } from '@tabler/icons-react';
+import { IconSearch, IconAlertTriangle, IconCheck, IconExternalLink, IconPhoto, IconFileSpreadsheet, IconFileTypePdf, IconFilter, IconX, IconBookmark, IconTrash, IconChevronDown, IconChevronRight } from '@tabler/icons-react';
 import { useSearchParams } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
 import axios from 'axios';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
-import { Accordion } from '@mantine/core';
+
 
 interface Violation {
   id: string;
@@ -65,8 +65,32 @@ export default function ScanPage() {
   const [searchParams] = useSearchParams();
 
   // Фильтры
-  const [searchFilter, setSearchFilter] = useState('');
+  const [searchFilter, setSearchFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState<string[]>([]);
+  
+  // Expandable Table
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+
+  const toggleExpand = (url: string) => {
+    setExpandedGroups((prev) => ({
+      ...prev,
+      [url]: !prev[url],
+    }));
+  };
+
+  const expandAll = () => {
+    const allExp: Record<string, boolean> = {};
+    if (typeof paginatedGroups !== 'undefined') {
+      paginatedGroups.forEach((g) => {
+        allExp[g.url] = true;
+      });
+    }
+    setExpandedGroups(allExp);
+  };
+
+  const collapseAll = () => {
+    setExpandedGroups({});
+  };
 
   const itemsPerPage = 10;
 
@@ -143,16 +167,22 @@ export default function ScanPage() {
   };
 
   const startScan = async () => {
+    let targetUrl = url.trim();
+    if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+      notifications.show({ title: 'Ошибка', message: 'Укажите полный URL (с http:// или https://)', color: 'orange' });
+      return;
+    }
+    
     setLoading(true);
     setResult(null);
     setPage(1);
     try {
       const res = await axios.post('http://127.0.0.1:8000/api/v1/scan', {
-        url,
+        url: targetUrl,
         max_depth: Number(depth),
         capture_screenshots: captureScreenshots,
       });
-      notifications.show({ title: 'Скан запущен', message: 'Проверка сайта началась в фоновом режиме', color: 'blue' });
+      notifications.show({ title: 'Сканирование запущено', message: 'Процесс запущен в фоновом режиме. Вы можете следить за статусом здесь или в разделе «История».', color: 'blue' });
       setTimeout(() => checkStatus(res.data.scan_id), 3000);
     } catch (err: unknown) {
       const msg = axios.isAxiosError(err) ? err.response?.data?.detail || err.message : String(err);
@@ -330,7 +360,7 @@ export default function ScanPage() {
     <Stack gap="xl">
       <Stack gap={0}>
         <Title order={2}>Сканирование сайтов</Title>
-        <Text c="dimmed">Анализ доменных зон на соответствие ФЗ №168‑ФЗ ( Phase 5 )</Text>
+        <Text c="dimmed">Глубокий анализ доменных зон на соответствие ФЗ №168‑ФЗ</Text>
       </Stack>
 
       <Paper p="xl" withBorder radius="md">
@@ -417,6 +447,8 @@ export default function ScanPage() {
                 />
                 <Group gap="sm">
                   <Button variant="default" onClick={() => { setTypeFilter([]); setSearchFilter(''); setPage(1); }}>Сбросить фильтры</Button>
+                  <Button variant="outline" color="gray" onClick={expandAll}>Развернуть все</Button>
+                  <Button variant="outline" color="gray" onClick={collapseAll}>Свернуть все</Button>
                   {filteredViolations.length > 0 && filteredViolations.some(v => v.type !== 'trademark') && (
                     <Button variant="light" color="blue" leftSection={<IconBookmark size={16}/>} onClick={addBulkTrademarks} loading={bulkLoading}>
                       Все в бренды
@@ -432,32 +464,82 @@ export default function ScanPage() {
             </Paper>
           ) : (
             <>
-              <Accordion variant="separated" radius="md">
-                {paginatedGroups.map((group) => (
-                  <Accordion.Item key={group.url} value={group.url}>
-                    <Accordion.Control>
-                      <Group justify="space-between" pr="md">
-                        <Box style={{ flex: 1, overflow: 'hidden' }}>
-                          <Text size="sm" fw={500} style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+              <Table 
+                highlightOnHover 
+                withTableBorder 
+                withColumnBorders 
+                withRowBorders 
+                striped 
+                verticalSpacing="xs"
+              >
+                <Table.Thead bg="gray.1">
+                  <Table.Tr>
+                    <Table.Th w={40} style={{ paddingLeft: '12px' }}></Table.Th>
+                    <Table.Th style={{ fontSize: '13px', textTransform: 'uppercase' }}>URL страницы</Table.Th>
+                    <Table.Th w={200} align="center" style={{ textAlign: 'center', fontSize: '13px', textTransform: 'uppercase' }}>Нарушений</Table.Th>
+                    <Table.Th w={100} align="right" style={{ textAlign: 'right', fontSize: '13px', textTransform: 'uppercase', paddingRight: '12px' }}>Действие</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                {paginatedGroups.map((group) => {
+                  const isExpanded = !!expandedGroups[group.url];
+                  return (
+                    <React.Fragment key={group.url}>
+                      {/* Master Row */}
+                      <Table.Tr 
+                        onClick={() => toggleExpand(group.url)}
+                        style={{ 
+                          cursor: "pointer", 
+                          backgroundColor: isExpanded ? "var(--mantine-color-blue-0)" : undefined,
+                          transition: "background-color 0.2s ease"
+                        }}
+                      >
+                        <Table.Td style={{ paddingLeft: '12px', borderBottom: isExpanded ? '0' : undefined }}>
+                          {isExpanded ? <IconChevronDown size={18} color="blue" /> : <IconChevronRight size={18} color="dimmed" />}
+                        </Table.Td>
+                        <Table.Td style={{ borderBottom: isExpanded ? '0' : undefined }}>
+                          <Text fw={600} size="sm" style={{ wordBreak: "break-all" }}>
                             {group.url}
                           </Text>
-                        </Box>
-                        <Badge variant="light" color="orange">
-                          {group.violations.length} {group.violations.length === 1 ? 'нарушение' : (group.violations.length < 5 ? 'нарушения' : 'нарушений')}
-                        </Badge>
-                      </Group>
-                    </Accordion.Control>
-                    <Accordion.Panel>
-                      {/* Desktop Table */}
-                      <Box visibleFrom="sm">
-                        <Table highlightOnHover withTableBorder>
-                          <Table.Thead>
+                        </Table.Td>
+                        <Table.Td align="center" style={{ textAlign: 'center', borderBottom: isExpanded ? '0' : undefined }}>
+                          <Badge variant="filled" color={group.violations.length > 0 ? "red" : "gray"} size="sm">
+                            {group.violations.length}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td align="right" style={{ textAlign: 'right', paddingRight: '12px', borderBottom: isExpanded ? '0' : undefined }}>
+                          <UnstyledButton
+                            component="a"
+                            href={group.url}
+                            target="_blank"
+                            title="Перейти на страницу"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <IconExternalLink size={18} color="var(--mantine-color-blue-6)" />
+                          </UnstyledButton>
+                        </Table.Td>
+                      </Table.Tr>
+                      
+                      {/* Detail Row */}
+                      <Table.Tr style={{ display: isExpanded ? "table-row" : "none" }}>
+                        <Table.Td colSpan={4} p={0} bg="blue.0" style={{ borderTop: 0 }}>
+                          <Collapse in={isExpanded}>
+                      {/* Desktop Table (inner) */}
+                      <Box visibleFrom="sm" p="sm" pl={40} pr="md" pb="md">
+                        <Paper withBorder radius="md" p={0} style={{ overflow: 'hidden' }}>
+                        <Table 
+                          highlightOnHover 
+                          withColumnBorders 
+                          verticalSpacing="xs"
+                          style={{ border: 0 }}
+                        >
+                          <Table.Thead bg="gray.0">
                             <Table.Tr>
-                              <Table.Th w={200}>Тип</Table.Th>
-                              <Table.Th w={180}>Слово</Table.Th>
-                              <Table.Th>Контекст</Table.Th>
-                              <Table.Th w={120}>Вес</Table.Th>
-                              <Table.Th w={110} align="right">Действие</Table.Th>
+                              <Table.Th style={{ fontSize: '11px', textTransform: 'uppercase' }}>Тип нарушения</Table.Th>
+                              <Table.Th style={{ fontSize: '11px', textTransform: 'uppercase' }}>Проблемное слово</Table.Th>
+                              <Table.Th style={{ fontSize: '11px', textTransform: 'uppercase' }}>Контекст</Table.Th>
+                              <Table.Th style={{ fontSize: '11px', textTransform: 'uppercase' }}>Вес (%)</Table.Th>
+                              <Table.Th align="right" style={{ textAlign: 'right', fontSize: '11px', textTransform: 'uppercase' }}>Действия</Table.Th>
                             </Table.Tr>
                           </Table.Thead>
                           <Table.Tbody>
@@ -508,6 +590,7 @@ export default function ScanPage() {
                             ))}
                           </Table.Tbody>
                         </Table>
+                        </Paper>
                       </Box>
 
                       {/* Mobile Cards */}
@@ -541,10 +624,14 @@ export default function ScanPage() {
                           </Paper>
                         ))}
                       </Stack>
-                    </Accordion.Panel>
-                  </Accordion.Item>
-                ))}
-              </Accordion>
+                            </Collapse>
+                        </Table.Td>
+                      </Table.Tr>
+                    </React.Fragment>
+                  );
+                })}
+              </Table.Tbody>
+            </Table>
 
               {groupedViolations.length > itemsPerPage && (
                 <Group justify="center" p="md" mt="md">

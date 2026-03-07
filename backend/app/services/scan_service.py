@@ -13,11 +13,9 @@ import re
 import uuid
 from urllib.parse import urljoin, urlparse
 
+import os
 import httpx
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.database import AsyncSessionLocal
-from app.models import Page, Scan, Violation
+from app.supabase_client import get_async_supabase
 from app.services.token_service import analyze_text
 from app.services.visual_dominance_service import analyze_visual_dominance
 
@@ -81,34 +79,33 @@ async def _run_scan(scan_id: str, url: str, max_depth: int, max_pages: int, capt
     """Основной цикл сканирования."""
     logger.info("Scan %s: starting for %s", scan_id, url)
 
-    async with AsyncSessionLocal() as db:
-        scan = await db.get(Scan, scan_id)
-        if not scan:
-            logger.error("Scan %s not found in DB", scan_id)
-            return
-        scan.status = "in_progress"
-        await db.commit()
+    # Создаем локальный клиент для текущего event loop
+    client = await get_async_supabase()
 
-        try:
-            await _scrape_site(scan_id, url, max_depth, max_pages, capture_screenshots, db)
+    # Обновляем статус скана через REST
+    try:
+        await client.table("scans").update({"status": "in_progress"}).eq("id", scan_id).execute()
+    except Exception as e:
+        logger.error("Scan %s: failed to mark as in_progress: %s", scan_id, e)
+        return
 
-            scan = await db.get(Scan, scan_id)
-            if scan:
-                from datetime import datetime, timezone
-                scan.status = "completed"
-                scan.finished_at = datetime.now(timezone.utc)
-                await db.commit()
-            logger.info("Scan %s: completed", scan_id)
-        except Exception as exc:
-            logger.exception("Scan %s: failed — %s", scan_id, exc)
-            scan = await db.get(Scan, scan_id)
-            if scan:
-                scan.status = "failed"
-                await db.commit()
+    try:
+        await _scrape_site(scan_id, url, max_depth, max_pages, capture_screenshots, client)
+
+        # Завершение скана
+        from datetime import datetime, timezone
+        await client.table("scans").update({
+            "status": "completed",
+            "finished_at": datetime.now(timezone.utc).isoformat()
+        }).eq("id", scan_id).execute()
+        logger.info("Scan %s: completed", scan_id)
+    except Exception as exc:
+        logger.exception("Scan %s: failed — %s", scan_id, exc)
+        await client.table("scans").update({"status": "failed"}).eq("id", scan_id).execute()
 
 
 async def _scrape_site(
-    scan_id: str, start_url: str, max_depth: int, max_pages: int, capture_screenshots: bool, db: AsyncSession
+    scan_id: str, start_url: str, max_depth: int, max_pages: int, capture_screenshots: bool, client: any
 ) -> None:
     """Обход сайта через Playwright с BFS."""
     try:
@@ -164,7 +161,8 @@ async def _scrape_site(
 
             try:
                 page = await context.new_page()
-                response = await page.goto(current_url, timeout=30000, wait_until="commit")
+                # Увеличиваем таймаут до 60с для тяжелых сайтов
+                response = await page.goto(current_url, timeout=60000, wait_until="domcontentloaded")
                 # Ждём загрузки DOM с коротким таймаутом (anti-bot часто задерживает DOMContentLoaded)
                 try:
                     await page.wait_for_load_state("domcontentloaded", timeout=10000)
@@ -211,18 +209,24 @@ async def _scrape_site(
                     logger.warning("Scan %s: httpx fallback also failed: %s", scan_id, e2)
                     page_status = "timeout"
 
-            # Сохраняем страницу в БД
+            # Сохраняем страницу через REST API (Async)
+            page_id = str(uuid.uuid4())
             content_hash = hashlib.md5(content_text.encode()).hexdigest()
-            db_page = Page(
-                id=str(uuid.uuid4()),
-                scan_id=scan_id,
-                url=current_url,
-                depth=depth,
-                status=page_status,
-                content_hash=content_hash,
-            )
-            db.add(db_page)
-            await db.flush()
+            
+            page_data = {
+                "id": page_id,
+                "scan_id": scan_id,
+                "url": current_url,
+                "depth": depth,
+                "status": page_status,
+                "content_hash": content_hash,
+            }
+
+            try:
+                await client.table("pages").insert(page_data).execute()
+            except Exception as e:
+                logger.warning("Scan %s: failed to save page data for %s: %s", scan_id, current_url, e)
+
             pages_count += 1
             logger.info("Scan %s: page %d — %s [%s]", scan_id, pages_count, current_url, page_status)
 
@@ -232,20 +236,23 @@ async def _scrape_site(
                 if not _is_russian_page(content_text):
                     logger.info("Scan %s: skipping non-Russian page: %s", scan_id, current_url)
                 else:
-                    result = await analyze_text(content_text, db)
+                    result = await analyze_text(content_text)
                     visual_violations = await analyze_visual_dominance(elements_data)
 
                     # Скриншот при нарушениях
                     screenshot_url = None
                     if capture_screenshots and (result.violations or visual_violations) and page is not None:
                         try:
-                            os_path = f"static/screenshots/{db_page.id}.png"
+                            os_path = f"static/screenshots/{page_id}.png"
                             await page.screenshot(path=os_path, full_page=False)
-                            screenshot_url = f"/static/screenshots/{db_page.id}.png"
+                            screenshot_url = f"/static/screenshots/{page_id}.png"
                         except Exception as e:
                             logger.warning("Scan %s: screenshot failed: %s", scan_id, e)
 
-                    # Сохраняем текстовые нарушения
+                    # Сохраняем нарушения (батчем через REST Async)
+                    violations_to_insert = []
+                    
+                    # Текстовые
                     for v_schema in result.violations:
                         details = {
                             "word": v_schema.word,
@@ -256,25 +263,36 @@ async def _scrape_site(
                         if screenshot_url:
                             details["screenshot_path"] = screenshot_url
 
-                        db.add(Violation(
-                            id=v_schema.id,
-                            page_id=db_page.id,
-                            type=v_schema.type,
-                            details=details,
-                        ))
+                        violations_to_insert.append({
+                            "id": v_schema.id,
+                            "page_id": page_id,
+                            "type": v_schema.type,
+                            "details": details,
+                        })
 
-                    # Сохраняем визуальные нарушения
+                    # Визуальные
                     for vv in visual_violations:
                         details = vv.copy()
                         if screenshot_url:
                             details["screenshot_path"] = screenshot_url
 
-                        db.add(Violation(
-                            id=str(uuid.uuid4()),
-                            page_id=db_page.id,
-                            type="visual_dominance",
-                        details=details,
-                    ))
+                        violations_to_insert.append({
+                            "id": str(uuid.uuid4()),
+                            "page_id": page_id,
+                            "type": "visual_dominance",
+                            "details": details,
+                        })
+                    
+                    if violations_to_insert:
+                        # Вставляем чанками по 20, чтобы избежать таймаутов (ReadTimeout)
+                        chunk_size = 20
+                        for i in range(0, len(violations_to_insert), chunk_size):
+                            chunk = violations_to_insert[i : i + chunk_size]
+                            try:
+                                await client.table("violations").insert(chunk).execute()
+                                logger.info("Scan %s: inserted chunk of %d violations", scan_id, len(chunk))
+                            except Exception as e:
+                                logger.warning("Scan %s: violations chunk insert failed: %s", scan_id, e)
 
             # Закрываем страницу
             if page is not None:
@@ -282,8 +300,6 @@ async def _scrape_site(
                     await page.close()
                 except Exception:
                     pass
-
-            await db.commit()
 
         await browser.close()
         logger.info("Scan %s: browser closed", scan_id)
@@ -302,7 +318,8 @@ async def _fetch_with_httpx(url: str) -> str:
             return ""
         # Простое извлечение текста из HTML
         import re
-        text = resp.text
+        import html
+        text = html.unescape(resp.text)
         # Убираем script/style теги
         text = re.sub(r'<script[^>]*>.*?</script>', ' ', text, flags=re.DOTALL | re.IGNORECASE)
         text = re.sub(r'<style[^>]*>.*?</style>', ' ', text, flags=re.DOTALL | re.IGNORECASE)

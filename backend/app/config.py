@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     max_pages_limit: int = 500
     max_file_size_mb: int = 10
 
+    supabase_url: str = ""
+    supabase_key: str = ""
+
     # CORS
     cors_origins: list[str] = [
         "http://localhost:5173", 

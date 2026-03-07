@@ -17,18 +17,16 @@ ALLOWED_EXTENSIONS = {"txt", "docx", "pdf"}
 @router.post("/check_text", response_model=CheckTextResponse)
 async def check_text(
     body: CheckTextRequest,
-    db: AsyncSession = Depends(get_db),
 ) -> CheckTextResponse:
     """specs/api.md — POST /api/v1/check_text"""
     logger.info("check_text: %d символов, format=%s", len(body.text), body.format)
-    result = await analyze_text(body.text, db)
+    result = await analyze_text(body.text)
     return result
 
 
 @router.post("/check_text/upload", response_model=CheckTextResponse)
 async def check_text_upload(
     file: UploadFile = File(...),
-    db: AsyncSession = Depends(get_db),
 ) -> CheckTextResponse:
     """Загрузка файла (TXT/DOCX/PDF) для проверки. specs/security.md."""
     # Валидация расширения
@@ -53,7 +51,7 @@ async def check_text_upload(
         raise HTTPException(status_code=422, detail="Не удалось извлечь текст из файла")
 
     logger.info("check_text/upload: %s (%d байт), ext=%s", file.filename, len(content), ext)
-    result = await analyze_text(text, db)
+    result = await analyze_text(text)
     return result
 
 

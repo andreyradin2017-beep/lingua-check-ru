@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "rest-api-design": {
+      "source": "aj-geddes/useful-ai-prompts",
+      "sourceType": "github",
+      "computedHash": "4e84e39b1a3915ee1920f504b2b08b5d1d836f100c8d389dd0b48e9c3cfc9d4c"
+    }
+  }
+}

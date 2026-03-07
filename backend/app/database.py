@@ -21,7 +21,8 @@ engine = create_async_engine(
     settings.database_url,
     echo=False,
     connect_args=connect_args,
-    poolclass=NullPool if "postgresql" in settings.database_url else QueuePool,
+    pool_pre_ping=True,
+    pool_recycle=300,
 )
 
 AsyncSessionLocal = async_sessionmaker(

@@ -2,11 +2,8 @@ import logging
 import uuid
 import re
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.core.analysis import tokenize
-from app.models import DictionaryWord, Trademark
+from app.supabase_client import get_async_supabase
 from app.schemas import CheckTextResponse, CheckTextSummary, ViolationSchema
 
 logger = logging.getLogger(__name__)
@@ -19,7 +16,7 @@ _EXCEPTIONS = {
     "обл", "респ", "ул", "д", "г", "стр", "оф", "кв", "м", "т", "тел", 
     "ао", "ооо", "пао", "зао", "тм", "ип", "инн", "кпп", "огрн",
     "email", "info", "melkom", "tm", "ru", "en", "текат", "текарт", 
-    "cookie", "cookies", "yandex", "smartcaptcha", "buher", "buhler", "pavan"
+    "cookie", "cookies", "yandex", "smartcaptcha", "buher", "buhler", "pavan", "nbsp"
 }
 
 
@@ -46,46 +43,56 @@ def _get_technical_word_parts(text: str) -> set[str]:
     return technical_parts
 
 
-async def _load_batch_data(tokens: list[dict], db: AsyncSession) -> tuple[dict[str, set[str]], set[str]]:
+async def _load_batch_data(tokens: list[dict], client: any = None) -> tuple[dict[str, set[str]], set[str]]:
     """
-    Загружает все необходимые данные для токенов за 2 SQL-запроса (вместо N+1).
-    Возвращает:
-      - words_sources: dict[normal_form, set(sources)]
-      - trademarks_set: set(normal_form)
+    Загружает все необходимые данные для токенов через Supabase REST API.
     """
-    # Собираем уникальные normal_form для слов, которые нужно проверить
+    if client is None:
+        client = await get_async_supabase()
+
     unique_nfs = {t["normal_form"] for t in tokens if t["language_hint"] == "ru" or t["raw_text"][0].isupper()}
     if not unique_nfs:
         return {}, set()
 
-    # Запрос 1: Источники словарей
-    words_result = await db.execute(
-        select(DictionaryWord.normal_form, DictionaryWord.source_dictionary)
-        .where(DictionaryWord.normal_form.in_(unique_nfs))
-        .distinct()
-    )
-    
+    unique_nfs_list = list(unique_nfs)
     words_sources: dict[str, set[str]] = {}
-    for nf, source in words_result.fetchall():
-        if nf not in words_sources:
-            words_sources[nf] = set()
-        words_sources[nf].add(source)
+    trademarks_set: set[str] = set()
+    
+    # Чанкуем запросы по 200 элементов, чтобы не превысить лимит URL/памяти Postgrest
+    chunk_size = 200
+    for i in range(0, len(unique_nfs_list), chunk_size):
+        chunk = unique_nfs_list[i : i + chunk_size]
+        
+        # REST запрос 1: Словарные слова
+        try:
+            words_resp = await client.table("dictionary_words").select("normal_form, source_dictionary").in_("normal_form", chunk).execute()
+            for item in words_resp.data:
+                nf = item["normal_form"]
+                source = item["source_dictionary"]
+                if nf not in words_sources:
+                    words_sources[nf] = set()
+                words_sources[nf].add(source)
+        except Exception as e:
+            logger.error("Error loading dictionary_words chunk: %s", e)
 
-    # Запрос 2: Товарные знаки
-    tm_result = await db.execute(
-        select(Trademark.normal_form)
-        .where(Trademark.normal_form.in_(unique_nfs))
-        .distinct()
-    )
-    trademarks_set = {row[0] for row in tm_result.fetchall()}
+        # REST запрос 2: Товарные знаки
+        try:
+            tm_resp = await client.table("trademarks").select("normal_form").in_("normal_form", chunk).execute()
+            for item in tm_resp.data:
+                trademarks_set.add(item["normal_form"])
+        except Exception as e:
+            logger.error("Error loading trademarks chunk: %s", e)
 
     return words_sources, trademarks_set
 
 
-async def analyze_text(text: str, db: AsyncSession) -> CheckTextResponse:
+async def analyze_text(text: str, client: any = None) -> CheckTextResponse:
     """
     Анализирует текст и формирует violations.
     """
+    if client is None:
+        client = await get_async_supabase()
+
     # 1. Извлекаем компоненты технических строк (email/url) для исключения
     tech_exceptions = _get_technical_word_parts(text)
     
@@ -95,8 +102,8 @@ async def analyze_text(text: str, db: AsyncSession) -> CheckTextResponse:
     # Есть ли в тексте русские слова (для определения no_russian_dub)
     has_russian = any(t["language_hint"] == "ru" for t in tokens)
 
-    # Предварительно загружаем данные обо всех токенах одним батчем (решает N+1)
-    words_sources, trademarks_set = await _load_batch_data(tokens, db)
+    # Предварительно загружаем данные обо всех токенах одним батчем через REST
+    words_sources, trademarks_set = await _load_batch_data(tokens, client)
 
     for token in tokens:
         lang = token["language_hint"]

@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Title, Stack, Group, Button, Textarea, Paper, Badge, Text, Tabs, FileButton, List, ThemeIcon, Pagination } from '@mantine/core';
+import { useLocalStorage } from '@mantine/hooks';
 import { IconFileText, IconTypography, IconAlertCircle, IconCheck, IconFileCheck, IconFileSpreadsheet, IconFileTypePdf } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import axios from 'axios';
@@ -24,7 +25,7 @@ interface TextResult {
 }
 
 export default function TextPage() {
-  const [text, setText] = useState('');
+  const [text, setText] = useLocalStorage({ key: 'linguacheck-last-text', defaultValue: '' });
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<TextResult | null>(null);
   const [activePage, setPage] = useState(1);
@@ -113,7 +114,7 @@ export default function TextPage() {
     <Stack gap="xl">
       <Stack gap={0}>
         <Title order={2}>Проверка текста и файлов</Title>
-        <Text c="dimmed">Мгновенный анализ на соответствие нормам русского языка ( Phase 5 )</Text>
+        <Text c="dimmed">Мгновенный анализ и экспорт отчетов на соответствие нормам</Text>
       </Stack>
 
       <Tabs defaultValue="manual">
@@ -131,7 +132,7 @@ export default function TextPage() {
               value={text}
               onChange={(e) => setText(e.currentTarget.value)}
             />
-            <Button mt="md" onClick={checkText} loading={loading} disabled={!text}>Проверить сейчас</Button>
+            <Button mt="md" onClick={checkText} loading={loading} disabled={!text.trim()}>Проверить сейчас</Button>
           </Paper>
         </Tabs.Panel>
 

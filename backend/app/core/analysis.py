@@ -2,6 +2,7 @@
 core/analysis.py — Phase 3
 Токенизация и морфологический анализ через pymorphy2.
 """
+import html
 import logging
 import re
 import unicodedata
@@ -49,6 +50,7 @@ def tokenize(text: str) -> list[dict]:
     Токенизирует текст и возвращает список токенов.
     Каждый токен: {raw_text, normal_form, part_of_speech, language_hint}
     """
+    text = html.unescape(text)
     tokens = []
     for match in _WORD_RE.finditer(text):
         raw = match.group()

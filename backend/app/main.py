@@ -2,12 +2,10 @@ import logging
 import sys
 import asyncio
 import os
-
-if sys.platform == 'win32':
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -49,6 +47,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    logger.exception("Global error: %s", exc)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc)},
+    )
 
 # Раздача скриншотов
 app.mount("/static", StaticFiles(directory="static"), name="static")
