@@ -46,22 +46,40 @@ def _get_technical_word_parts(text: str) -> set[str]:
     return technical_parts
 
 
-async def _get_word_sources(normal_form: str, db: AsyncSession) -> set[str]:
-    """Возвращает множество словарей, в которых найдена лемма."""
-    result = await db.execute(
-        select(DictionaryWord.source_dictionary)
-        .where(DictionaryWord.normal_form == normal_form)
+async def _load_batch_data(tokens: list[dict], db: AsyncSession) -> tuple[dict[str, set[str]], set[str]]:
+    """
+    Загружает все необходимые данные для токенов за 2 SQL-запроса (вместо N+1).
+    Возвращает:
+      - words_sources: dict[normal_form, set(sources)]
+      - trademarks_set: set(normal_form)
+    """
+    # Собираем уникальные normal_form для слов, которые нужно проверить
+    unique_nfs = {t["normal_form"] for t in tokens if t["language_hint"] == "ru" or t["raw_text"][0].isupper()}
+    if not unique_nfs:
+        return {}, set()
+
+    # Запрос 1: Источники словарей
+    words_result = await db.execute(
+        select(DictionaryWord.normal_form, DictionaryWord.source_dictionary)
+        .where(DictionaryWord.normal_form.in_(unique_nfs))
         .distinct()
     )
-    return {row[0] for row in result.fetchall()}
+    
+    words_sources: dict[str, set[str]] = {}
+    for nf, source in words_result.fetchall():
+        if nf not in words_sources:
+            words_sources[nf] = set()
+        words_sources[nf].add(source)
 
-
-async def _is_trademark(normal_form: str, db: AsyncSession) -> bool:
-    """Проверяет, является ли слово товарным знаком."""
-    result = await db.execute(
-        select(Trademark.id).where(Trademark.normal_form == normal_form).limit(1)
+    # Запрос 2: Товарные знаки
+    tm_result = await db.execute(
+        select(Trademark.normal_form)
+        .where(Trademark.normal_form.in_(unique_nfs))
+        .distinct()
     )
-    return result.scalar() is not None
+    trademarks_set = {row[0] for row in tm_result.fetchall()}
+
+    return words_sources, trademarks_set
 
 
 async def analyze_text(text: str, db: AsyncSession) -> CheckTextResponse:
@@ -77,8 +95,8 @@ async def analyze_text(text: str, db: AsyncSession) -> CheckTextResponse:
     # Есть ли в тексте русские слова (для определения no_russian_dub)
     has_russian = any(t["language_hint"] == "ru" for t in tokens)
 
-    trademark_cache = {}
-    sources_cache = {}
+    # Предварительно загружаем данные обо всех токенах одним батчем (решает N+1)
+    words_sources, trademarks_set = await _load_batch_data(tokens, db)
 
     for token in tokens:
         lang = token["language_hint"]
@@ -103,11 +121,8 @@ async def analyze_text(text: str, db: AsyncSession) -> CheckTextResponse:
         end = min(len(text), idx + len(raw_text) + 40)
         context = text[start:end].strip()
 
-        # Товарный знак
-        if normal_form not in trademark_cache:
-            trademark_cache[normal_form] = await _is_trademark(normal_form, db)
-            
-        if trademark_cache[normal_form]:
+        # Товарный знак (проверка O(1) по in-memory сету загруженному в начале)
+        if normal_form in trademarks_set:
             violations.append(
                 ViolationSchema(
                     id=str(uuid.uuid4()),
@@ -121,11 +136,8 @@ async def analyze_text(text: str, db: AsyncSession) -> CheckTextResponse:
             )
             continue
 
-        # Получаем источники
-        if normal_form not in sources_cache:
-            sources_cache[normal_form] = await _get_word_sources(normal_form, db)
-        
-        sources = sources_cache[normal_form]
+        # Получаем источники (O(1) чтение из in-memory словаря)
+        sources = words_sources.get(normal_form, set())
 
         # Имена собственные (кириллица с большой буквы)
         if lang == "ru" and raw_text[0].isupper() and not sources:

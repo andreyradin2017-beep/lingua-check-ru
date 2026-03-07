@@ -1,32 +1,103 @@
-import { Title, Text, Button, Container, Group } from '@mantine/core';
+import { Title, Text, Button, Container, Group, Stack, Box } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
 
 export default function NotFoundPage() {
   const navigate = useNavigate();
 
   return (
-    <Container size="md" py={80} style={{ textAlign: 'center' }}>
-      <Title
-        style={{
-          fontWeight: 900,
-          fontSize: '120px',
-          lineHeight: 1,
-          marginBottom: 'var(--mantine-spacing-xl)',
-          color: 'var(--mantine-color-gray-3)'
-        }}
-      >
-        404
-      </Title>
-      <Title order={1} mb="md">Вы нашли секретное место.</Title>
-      <Text c="dimmed" size="lg" ta="center" mb="xl">
-        К сожалению, это всего лишь страница 404. Возможно, вы ошиблись при вводе адреса 
-        или страница была перемещена по другому URL.
-      </Text>
-      <Group justify="center">
-        <Button variant="outline" size="md" onClick={() => navigate('/')}>
-          Вернуться на главную
-        </Button>
-      </Group>
+    <Container size="md" py={120}>
+      <Stack align="center" gap="xl">
+        <Box
+          style={{
+            position: 'relative',
+            height: 200,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {/* Blobs for premium feel */}
+          <Box
+            style={{
+              position: 'absolute',
+              width: 300,
+              height: 300,
+              background: 'radial-gradient(circle, rgba(25, 113, 194, 0.15) 0%, rgba(25, 113, 194, 0) 70%)',
+              filter: 'blur(40px)',
+              top: -50,
+              left: -50,
+              zIndex: 0,
+            }}
+          />
+          <Box
+            style={{
+              position: 'absolute',
+              width: 300,
+              height: 300,
+              background: 'radial-gradient(circle, rgba(16, 152, 173, 0.15) 0%, rgba(16, 152, 173, 0) 70%)',
+              filter: 'blur(40px)',
+              bottom: -50,
+              right: -50,
+              zIndex: 0,
+            }}
+          />
+
+          <Text
+            style={{
+              fontWeight: 900,
+              fontSize: 'min(25vw, 180px)',
+              lineHeight: 1,
+              opacity: 0.1,
+              position: 'absolute',
+              zIndex: 0,
+              userSelect: 'none',
+              filter: 'blur(2px)',
+            }}
+          >
+            404
+          </Text>
+          <Title
+            className="gradient-text"
+            style={{
+              fontWeight: 900,
+              fontSize: 'min(20vw, 120px)',
+              lineHeight: 1,
+              zIndex: 1,
+              textShadow: '0 10px 30px rgba(0,0,0,0.1)',
+            }}
+          >
+            404
+          </Title>
+        </Box>
+        
+        <Stack align="center" gap="sm">
+          <Title order={1} ta="center">Страница не найдена</Title>
+          <Text c="dimmed" size="lg" ta="center" maw={500}>
+            Похоже, вы забрели в неизведанную область нашего сервиса. 
+            Вернитесь на главную, чтобы продолжить проверку текстов.
+          </Text>
+        </Stack>
+
+        <Group justify="center" mt="xl">
+          <Button 
+            variant="gradient" 
+            gradient={{ from: 'blue', to: 'cyan' }} 
+            size="lg" 
+            radius="md"
+            onClick={() => navigate('/')}
+          >
+            Вернуться на главную
+          </Button>
+          <Button 
+            variant="outline" 
+            size="lg" 
+            radius="md"
+            onClick={() => navigate(-1)}
+          >
+            Назад
+          </Button>
+        </Group>
+      </Stack>
     </Container>
   );
 }

@@ -4,14 +4,24 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.config import settings
 
+import sqlalchemy
+
 logger = logging.getLogger(__name__)
 
-connect_args = {"check_same_thread": False} if "sqlite" in settings.database_url else {}
+from sqlalchemy.pool import NullPool, QueuePool
+
+connect_args = {}
+if "sqlite" in settings.database_url:
+    connect_args["check_same_thread"] = False
+elif "postgresql" in settings.database_url:
+    connect_args["prepared_statement_cache_size"] = 0
+    connect_args["statement_cache_size"] = 0
 
 engine = create_async_engine(
     settings.database_url,
     echo=False,
     connect_args=connect_args,
+    poolclass=NullPool if "postgresql" in settings.database_url else QueuePool,
 )
 
 AsyncSessionLocal = async_sessionmaker(

@@ -4,7 +4,7 @@ import asyncio
 import os
 
 if sys.platform == 'win32':
-    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -27,9 +27,9 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     logger.info("Starting LinguaCheck-RU backend...")
     os.makedirs("static/screenshots", exist_ok=True)
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    logger.info("Database tables ensured.")
+    # Таблицы уже созданы в Supabase. Интроспекция (create_all) 
+    # через PgBouncer Transaction Mode приводит к ошибкам.
+    logger.info("Database tables ensured (skipped DDL via pooler).")
     yield
     logger.info("Shutting down LinguaCheck-RU backend...")
     await engine.dispose()

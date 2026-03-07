@@ -1,7 +1,7 @@
 import { AppShell, Burger, Group, NavLink, Title, Text, Container } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import { IconGlobe, IconFileText, IconBooks, IconHome, IconSearch } from '@tabler/icons-react';
+import { IconGlobe, IconFileText, IconBooks, IconHome, IconSearch, IconHistory } from '@tabler/icons-react';
 
 // Импортируем страницы (создадим их следом)
 import HomePage from './pages/HomePage';
@@ -18,8 +18,8 @@ export default function App() {
 
   const navItems = [
     { label: 'Главная', icon: <IconHome size="1rem" />, path: '/' },
+    { label: 'История', icon: <IconHistory size="1rem" />, path: '/history' },
     { label: 'Сайты', icon: <IconGlobe size="1rem" />, path: '/scans' },
-    { label: 'История', icon: <IconHome size="1rem" />, path: '/history' },
     { label: 'Текст и файлы', icon: <IconFileText size="1rem" />, path: '/text' },
     { label: 'Словари', icon: <IconBooks size="1rem" />, path: '/dictionaries' },
   ];

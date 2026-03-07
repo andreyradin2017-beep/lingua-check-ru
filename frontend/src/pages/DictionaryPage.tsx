@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Title, Card, Stack, Group, SimpleGrid, Badge, Text } from '@mantine/core';
-import { IconBooks, IconDatabase } from '@tabler/icons-react';
+import { Title, Card, Stack, Group, SimpleGrid, Badge, Text, Loader, Center } from '@mantine/core';
+import { IconBooks, IconDatabase, IconAlertCircle } from '@tabler/icons-react';
 import axios from 'axios';
 
 interface DictionaryVersion {
@@ -11,11 +11,19 @@ interface DictionaryVersion {
 
 export default function DictionaryPage() {
   const [data, setData] = useState<DictionaryVersion[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     axios.get('http://127.0.0.1:8000/api/v1/dictionary_preview')
-      .then(res => setData(res.data.dictionary_versions))
-      .catch(err => console.error(err));
+      .then(res => {
+        setData(res.data.dictionary_versions);
+      })
+      .catch(err => {
+        console.error(err);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, []);
 
   const translateDictName = (name: string) => {
@@ -28,6 +36,17 @@ export default function DictionaryPage() {
     }
   };
 
+  if (loading) {
+    return (
+      <Center style={{ height: '50vh' }}>
+        <Stack align="center" gap="md">
+          <Loader size="xl" variant="bars" />
+          <Text c="dimmed">Загрузка словарей...</Text>
+        </Stack>
+      </Center>
+    );
+  }
+
   return (
     <Stack gap="lg">
       <Group justify="space-between">
@@ -37,9 +56,9 @@ export default function DictionaryPage() {
         </Stack>
       </Group>
 
-      <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="lg">
-        {data.length > 0 ? (
-          data.map((dict, i) => (
+      {data.length > 0 ? (
+        <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="lg">
+          {data.map((dict, i) => (
             <Card key={i} shadow="sm" p="lg" radius="md" withBorder>
               <Group justify="space-between" mb="xs">
                 <IconBooks size={40} color="var(--mantine-color-blue-6)" />
@@ -54,11 +73,17 @@ export default function DictionaryPage() {
                 <Text size="sm" fw={500}>{dict.word_count.toLocaleString()} слов</Text>
               </Group>
             </Card>
-          ))
-        ) : (
-          <Text c="dimmed">Словари еще не импортированы. Используйте python scripts/import_dictionaries.py</Text>
-        )}
-      </SimpleGrid>
+          ))}
+        </SimpleGrid>
+      ) : (
+        <Center style={{ height: '30vh' }}>
+          <Stack align="center" gap="xs">
+            <IconAlertCircle size={48} color="gray" opacity={0.5} />
+            <Text c="dimmed" fw={500}>Словари не найдены</Text>
+            <Text size="sm" c="dimmed">Пожалуйста, проверьте подключение к базе данных или повторите импорт.</Text>
+          </Stack>
+        </Center>
+      )}
     </Stack>
   );
 }
