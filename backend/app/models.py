@@ -145,6 +145,8 @@ class Page(Base):
         "Violation", back_populates="page"
     )
 
+    __table_args__ = (Index("idx_pages_scan_id", "scan_id"),)
+
 
 # ---------------------------------------------------------------------------
 # 7. tokens
@@ -173,7 +175,10 @@ class Token(Base):
         "Violation", back_populates="token"
     )
 
-    __table_args__ = (Index("idx_tokens_normal_form", "normal_form"),)
+    __table_args__ = (
+        Index("idx_tokens_page_id", "page_id"),
+        Index("idx_tokens_normal_form", "normal_form"),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -200,3 +205,5 @@ class Violation(Base):
 
     token: Mapped["Token | None"] = relationship("Token", back_populates="violations")
     page: Mapped["Page | None"] = relationship("Page", back_populates="violations")
+
+    __table_args__ = (Index("idx_violations_page_id", "page_id"),)

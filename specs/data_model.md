@@ -47,6 +47,7 @@
 - `depth` (int)
 - `status` (text: "ok" | "timeout" | "blocked")
 - `content_hash` (text)
+- `idx_pages_scan_id` on (`scan_id`)
 
 ---
 
@@ -65,6 +66,7 @@
 Индексы:
 
 - `idx_tokens_normal_form` on (`normal_form`)
+- `idx_tokens_page_id` on (`page_id`)
 
 ---
 
@@ -77,6 +79,7 @@
 - `type` (text: "foreign_word" | "visual_dominance" | "no_russian_dub" | "unrecognized_word" | "trademark" | "possible_trademark")
 - `details` (JSONB)
 - `created_at` (timestamp)
+- `idx_violations_page_id` on (`page_id`)
 
 ---
 

@@ -2,6 +2,9 @@ import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import text
+from app.database import get_db
 from app.supabase_client import get_async_supabase
 from app.schemas import (
     PageSchema,
@@ -182,40 +185,39 @@ async def delete_scan(scan_id: str):
     """Удаляет скан и все связанные с ним данные (страницы, нарушения)."""
     client = await get_async_supabase()
     
-    # Сначала найдем скан, чтобы узнать project_id
+    # 1. Находим скан
     scan_resp = await client.table("scans").select("project_id").eq("id", scan_id).execute()
     if not scan_resp.data:
         raise HTTPException(status_code=404, detail="Скан не найден")
     
     project_id = scan_resp.data[0].get("project_id")
     
-    # Получаем ID страниц для удаления нарушений
+    # 2. Получаем ID страниц
     pages_resp = await client.table("pages").select("id").eq("scan_id", scan_id).execute()
     page_ids = [p["id"] for p in pages_resp.data]
     
-    # 1. Удаляем нарушения и токены (т.к. они ссылаются на страницы)
+    # 3. Каскадное удаление через REST
     if page_ids:
-        # Разбиваем на чанки, если страниц очень много (Supabase IN limit)
+        # Удаляем нарушения и токены пачками по 100
         for i in range(0, len(page_ids), 100):
             chunk = page_ids[i:i+100]
-            # Сначала нарушения
             await client.table("violations").delete().in_("page_id", chunk).execute()
-            # Затем токены
             await client.table("tokens").delete().in_("page_id", chunk).execute()
             
-    # 2. Удаляем страницы
+    # 4. Удаляем страницы
     await client.table("pages").delete().eq("scan_id", scan_id).execute()
     
-    # 3. Удаляем скан
+    # 5. Удаляем скан
     await client.table("scans").delete().eq("id", scan_id).execute()
     
-    # 4. Удаляем проект (т.к. у нас 1 скан = 1 проект в текущей реализации)
+    # 6. Удаляем проект
     if project_id:
         try:
             await client.table("projects").delete().eq("id", project_id).execute()
         except Exception as e:
             logger.warning("Could not delete project %s: %s", project_id, e)
-    logger.info("Scan %s and its data deleted", scan_id)
+
+    logger.info("Scan %s and its data deleted via REST API", scan_id)
     return {"status": "deleted", "scan_id": scan_id}
 
 @router.delete("/scans")
@@ -223,16 +225,11 @@ async def clear_scans() -> dict:
     """Очищает всю историю сканирований."""
     client = await get_async_supabase()
     
-    # 1. Удаляем всё из violations, tokens, pages, scans, projects
-    # В адекватной БД это должен делать CASCADE, но тут сделаем через очистку таблиц
-    # (Supabase/Postgrest не дает просто TRUNCATE через REST, поэтому удаляем всё с фильтром .neq("id", 0))
+    # Удаляем всё по очереди
+    # На бесплатном тарифе Supabase REST не дает TRUNCATE, удаляем через фильтр
+    for table in ["violations", "tokens", "pages", "scans", "projects"]:
+        await client.table(table).delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
     
-    await client.table("violations").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
-    await client.table("tokens").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
-    await client.table("pages").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
-    await client.table("scans").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
-    await client.table("projects").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
-    
-    logger.info("All scans history cleared")
+    logger.info("All scans history cleared via REST API")
     return {"status": "cleared"}
 
