@@ -17,9 +17,10 @@ import os
 import httpx
 from app.supabase_client import get_async_supabase
 from app.services.token_service import analyze_text
-from app.services.visual_dominance_service import analyze_visual_dominance
 
 logger = logging.getLogger(__name__)
+# Глобальный реестр активных сканов для управления их остановкой
+_ACTIVE_SCANS: dict[str, threading.Event] = {}
 
 
 def _is_russian_page(text: str) -> bool:
@@ -65,6 +66,10 @@ async def start_scan_background(
     scan_id: str, url: str, max_depth: int, max_pages: int, capture_screenshots: bool = True
 ) -> None:
     """Запускает сканирование в отдельном потоке (ProactorEventLoop совместимый с Playwright)."""
+    # Создаем событие для возможности остановки
+    stop_event = threading.Event()
+    _ACTIVE_SCANS[scan_id] = stop_event
+    
     t = threading.Thread(
         target=_run_scan_in_thread,
         args=(scan_id, url, max_depth, max_pages, capture_screenshots),
@@ -73,6 +78,15 @@ async def start_scan_background(
     )
     t.start()
     logger.info("Scan %s: thread started", scan_id)
+
+
+def stop_scan(scan_id: str) -> bool:
+    """Сигнализирует скану о необходимости остановиться."""
+    if scan_id in _ACTIVE_SCANS:
+        _ACTIVE_SCANS[scan_id].set()
+        logger.info("Scan %s: stop signal sent", scan_id)
+        return True
+    return False
 
 
 async def _run_scan(scan_id: str, url: str, max_depth: int, max_pages: int, capture_screenshots: bool = True) -> None:
@@ -94,14 +108,23 @@ async def _run_scan(scan_id: str, url: str, max_depth: int, max_pages: int, capt
 
         # Завершение скана
         from datetime import datetime, timezone
+        status = "completed"
+        if scan_id in _ACTIVE_SCANS and _ACTIVE_SCANS[scan_id].is_set():
+            status = "stopped"
+            logger.info("Scan %s: was stopped by user", scan_id)
+
         await client.table("scans").update({
-            "status": "completed",
+            "status": status,
             "finished_at": datetime.now(timezone.utc).isoformat()
         }).eq("id", scan_id).execute()
-        logger.info("Scan %s: completed", scan_id)
+        logger.info("Scan %s: %s", scan_id, status)
     except Exception as exc:
         logger.exception("Scan %s: failed — %s", scan_id, exc)
         await client.table("scans").update({"status": "failed"}).eq("id", scan_id).execute()
+    finally:
+        # Убираем из реестра активных
+        if scan_id in _ACTIVE_SCANS:
+            del _ACTIVE_SCANS[scan_id]
 
 
 async def _scrape_site(
@@ -144,8 +167,15 @@ async def _scrape_site(
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
             },
         )
+        
+        stop_event = _ACTIVE_SCANS.get(scan_id)
 
         while queue and pages_count < max_pages:
+            # Проверка сигнала на остановку
+            if stop_event and stop_event.is_set():
+                logger.info("Scan %s: scraping loop stopped", scan_id)
+                break
+
             current_url, depth = queue.pop(0)
             if current_url in visited:
                 continue
@@ -161,36 +191,54 @@ async def _scrape_site(
 
             try:
                 page = await context.new_page()
-                # Увеличиваем таймаут до 60с для тяжелых сайтов
-                response = await page.goto(current_url, timeout=60000, wait_until="domcontentloaded")
-                # Ждём загрузки DOM с коротким таймаутом (anti-bot часто задерживает DOMContentLoaded)
+                # Увеличиваем таймаут до 120с для тяжелых сайтов
+                response = await page.goto(current_url, timeout=120000, wait_until="domcontentloaded")
+                # Ждём стабилизации сети (важно для JS-сайтов)
                 try:
-                    await page.wait_for_load_state("domcontentloaded", timeout=10000)
+                    await page.wait_for_load_state("networkidle", timeout=15000)
                 except Exception:
-                    pass  # Возьмём что успело загрузиться
-
+                    pass
+                    
                 if not response or response.status >= 400:
                     page_status = "blocked"
                     logger.warning("Scan %s: blocked %s (status %s)", scan_id, current_url,
                                    response.status if response else "no response")
                 else:
+                    # Ждем чуть больше для динамических сайтов
+                    await asyncio.sleep(2)
                     content_text = await page.inner_text("body")
                     elements_data = await _extract_elements(page)
 
                     # Собираем ссылки для BFS
                     if depth < max_depth:
                         try:
+                            # 1. Сбор стандартных <a> ссылок
                             links = await page.evaluate("""
                                 () => Array.from(document.querySelectorAll('a[href]'))
                                     .map(a => a.href)
                                     .filter(h => h.startsWith('http'))
                             """)
-                            for link in links:
+                            
+                            # 2. Дополнительный поиск ссылок в тексте (для JS-навигации и скрытых меню)
+                            # Ищем строки, похожие на относительные или абсолютные пути внутри домена
+                            raw_html = await page.content()
+                            
+                            # Паттерн для поиска ссылок в HTML/JS (кавычки, слеш и т.д.)
+                            # Ищем что-то вроде "/about/", "/catalog/..."
+                            found_paths = re.findall(r'["\'](/[^"\'\s>]+/)["\']', raw_html)
+                            for path in found_paths:
+                                full_url = urljoin(start_url, path)
+                                links.append(full_url)
+
+                            for link in set(links): # Убираем дубликаты
                                 link = link.split('#')[0]
+                                link = link.rstrip('/') # Нормализуем слеш
+                                
                                 ext = link.split('.')[-1].lower() if '.' in link else ''
                                 if ext in ('pdf', 'jpg', 'jpeg', 'png', 'gif', 'svg', 'zip', 'doc', 'docx', 'xls', 'xlsx'):
                                     continue
-                                if link not in visited and urlparse(link).netloc == base_domain:
+                                    
+                                if link not in visited:
                                     queue.append((link, depth + 1))
                         except Exception as e:
                             logger.warning("Scan %s: links extract error: %s", scan_id, e)
@@ -237,11 +285,10 @@ async def _scrape_site(
                     logger.info("Scan %s: skipping non-Russian page: %s", scan_id, current_url)
                 else:
                     result = await analyze_text(content_text)
-                    visual_violations = await analyze_visual_dominance(elements_data)
 
                     # Скриншот при нарушениях
                     screenshot_url = None
-                    if capture_screenshots and (result.violations or visual_violations) and page is not None:
+                    if capture_screenshots and result.violations and page is not None:
                         try:
                             os_path = f"static/screenshots/{page_id}.png"
                             await page.screenshot(path=os_path, full_page=False)
@@ -251,8 +298,8 @@ async def _scrape_site(
 
                     # Сохраняем нарушения (батчем через REST Async)
                     violations_to_insert = []
-                    
-                    # Текстовые
+
+                    # Текстовые нарушения
                     for v_schema in result.violations:
                         details = {
                             "word": v_schema.word,
@@ -270,22 +317,9 @@ async def _scrape_site(
                             "details": details,
                         })
 
-                    # Визуальные
-                    for vv in visual_violations:
-                        details = vv.copy()
-                        if screenshot_url:
-                            details["screenshot_path"] = screenshot_url
-
-                        violations_to_insert.append({
-                            "id": str(uuid.uuid4()),
-                            "page_id": page_id,
-                            "type": "visual_dominance",
-                            "details": details,
-                        })
-                    
                     if violations_to_insert:
-                        # Вставляем чанками по 20, чтобы избежать таймаутов (ReadTimeout)
-                        chunk_size = 20
+                        # Вставляем чанками по 200 для оптимизации количества запросов к БД
+                        chunk_size = 200
                         for i in range(0, len(violations_to_insert), chunk_size):
                             chunk = violations_to_insert[i : i + chunk_size]
                             try:

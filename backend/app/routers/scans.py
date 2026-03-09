@@ -1,7 +1,9 @@
 import logging
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from app.database import get_db
@@ -15,14 +17,17 @@ from app.schemas import (
     ViolationSchema,
     ScanHistoryItem,
 )
-from app.services.scan_service import start_scan_background
+from app.services.scan_service import start_scan_background, stop_scan
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post("/scan", response_model=ScanStartResponse, status_code=202)
+@limiter.limit("5/minute")  # Максимум 5 сканирований в минуту
 async def create_scan(
+    request: Request,
     body: ScanStartRequest,
 ) -> ScanStartResponse:
     """
@@ -58,6 +63,37 @@ async def create_scan(
     )
 
     return ScanStartResponse(scan_id=scan_id, status="started")
+
+
+@router.post("/scan/{scan_id}/stop")
+async def stop_scan_endpoint(scan_id: str):
+    """
+    Останавливает активное сканирование.
+    """
+    success = stop_scan(scan_id)
+    if not success:
+        # Проверяем статус в БД
+        client = await get_async_supabase()
+        resp = await client.table("scans").select("status").eq("id", scan_id).execute()
+        if not resp.data:
+            raise HTTPException(status_code=404, detail="Скан не найден")
+        
+        status = resp.data[0]["status"]
+        if status in ["completed", "failed", "stopped"]:
+            return {"status": "ignored", "message": "Скан уже завершен", "current_status": status}
+            
+        # Если статус в БД "активен", но процесса нет — это "осиротевший" скан.
+        # Просто переводим его в "stopped".
+        logger.info("Scan %s: orphaned scan found, marking as stopped in DB", scan_id)
+        from datetime import datetime, timezone
+        await client.table("scans").update({
+            "status": "stopped",
+            "finished_at": datetime.now(timezone.utc).isoformat()
+        }).eq("id", scan_id).execute()
+        
+        return {"status": "stopped_orphaned", "scan_id": scan_id}
+    
+    return {"status": "stopping", "scan_id": scan_id}
 
 
 @router.get("/scans", response_model=list[ScanHistoryItem])
@@ -126,14 +162,13 @@ async def get_scan(
             word=v.get("details", {}).get("word") if v.get("details") else None,
             normal_form=v.get("details", {}).get("normal_form") if v.get("details") else None,
             text_context=v.get("details", {}).get("text_context", "") if v.get("details") else "",
-            visual_weight_foreign=v.get("details", {}).get("visual_weight_foreign") if v.get("details") else None,
-            visual_weight_rus=v.get("details", {}).get("visual_weight_rus") if v.get("details") else None,
         )
         for v in violations
     ]
 
     return ScanStatusResponse(
         status=scan["status"],
+        target_url=scan.get("target_url"),
         summary=ScanSummary(
             total_pages=len(pages),
             pages_with_violations=pages_with_v,
@@ -173,8 +208,6 @@ async def get_scan_violations(
             word=v.get("details", {}).get("word") if v.get("details") else None,
             normal_form=v.get("details", {}).get("normal_form") if v.get("details") else None,
             text_context=v.get("details", {}).get("text_context", "") if v.get("details") else "",
-            visual_weight_foreign=v.get("details", {}).get("visual_weight_foreign") if v.get("details") else None,
-            visual_weight_rus=v.get("details", {}).get("visual_weight_rus") if v.get("details") else None,
         )
         for v in violations
     ]
@@ -183,53 +216,59 @@ async def get_scan_violations(
 @router.delete("/scan/{scan_id}")
 async def delete_scan(scan_id: str):
     """Удаляет скан и все связанные с ним данные (страницы, нарушения)."""
+    logger.info("Request to delete scan: %s", scan_id)
     client = await get_async_supabase()
     
-    # 1. Находим скан
-    scan_resp = await client.table("scans").select("project_id").eq("id", scan_id).execute()
-    if not scan_resp.data:
-        raise HTTPException(status_code=404, detail="Скан не найден")
-    
-    project_id = scan_resp.data[0].get("project_id")
-    
-    # 2. Получаем ID страниц
-    pages_resp = await client.table("pages").select("id").eq("scan_id", scan_id).execute()
-    page_ids = [p["id"] for p in pages_resp.data]
-    
-    # 3. Каскадное удаление через REST
-    if page_ids:
-        # Удаляем нарушения и токены пачками по 100
-        for i in range(0, len(page_ids), 100):
-            chunk = page_ids[i:i+100]
-            await client.table("violations").delete().in_("page_id", chunk).execute()
-            await client.table("tokens").delete().in_("page_id", chunk).execute()
+    try:
+        # 1. Находим скан
+        scan_resp = await client.table("scans").select("project_id").eq("id", scan_id).execute()
+        if not scan_resp.data:
+            logger.warning("Scan not found: %s", scan_id)
+            raise HTTPException(status_code=404, detail="Скан не найден")
+        
+        project_id = scan_resp.data[0].get("project_id")
+        
+        # 2. Удаление связанных данных (каскадное в БД должно работать, но здесь делаем явно)
+        # На нарушениях и токенах могут быть индексы, удаляем сначала их
+        pages_resp = await client.table("pages").select("id").eq("scan_id", scan_id).execute()
+        page_ids = [p["id"] for p in pages_resp.data]
+        
+        if page_ids:
+            logger.info("Deleting violations and tokens for %d pages", len(page_ids))
+            await client.table("violations").delete().in_("page_id", page_ids).execute()
+            await client.table("tokens").delete().in_("page_id", page_ids).execute()
+            await client.table("pages").delete().eq("scan_id", scan_id).execute()
             
-    # 4. Удаляем страницы
-    await client.table("pages").delete().eq("scan_id", scan_id).execute()
-    
-    # 5. Удаляем скан
-    await client.table("scans").delete().eq("id", scan_id).execute()
-    
-    # 6. Удаляем проект
-    if project_id:
-        try:
+        # 3. Удаляем скан
+        await client.table("scans").delete().eq("id", scan_id).execute()
+        
+        # 4. Удаляем проект (если есть)
+        if project_id:
+            logger.info("Deleting project: %s", project_id)
             await client.table("projects").delete().eq("id", project_id).execute()
-        except Exception as e:
-            logger.warning("Could not delete project %s: %s", project_id, e)
 
-    logger.info("Scan %s and its data deleted via REST API", scan_id)
-    return {"status": "deleted", "scan_id": scan_id}
+        logger.info("Scan %s deleted successfully", scan_id)
+        return {"status": "deleted", "scan_id": scan_id}
+    except Exception as e:
+        logger.error("Error during scan deletion %s: %s", scan_id, str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/scans")
 async def clear_scans() -> dict:
     """Очищает всю историю сканирований."""
+    logger.info("Request to clear ALL scans history")
     client = await get_async_supabase()
     
-    # Удаляем всё по очереди
-    # На бесплатном тарифе Supabase REST не дает TRUNCATE, удаляем через фильтр
-    for table in ["violations", "tokens", "pages", "scans", "projects"]:
-        await client.table(table).delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
-    
-    logger.info("All scans history cleared via REST API")
-    return {"status": "cleared"}
+    try:
+        # Удаляем всё по очереди
+        # На бесплатном тарифе Supabase REST не дает TRUNCATE, удаляем через фильтр
+        for table in ["violations", "tokens", "pages", "scans", "projects"]:
+            logger.info("Clearing table: %s", table)
+            await client.table(table).delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
+        
+        logger.info("All scans history cleared successfully")
+        return {"status": "cleared"}
+    except Exception as e:
+        logger.error("Error during history clearing: %s", str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 

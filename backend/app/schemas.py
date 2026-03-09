@@ -15,13 +15,11 @@ from pydantic import BaseModel, Field, HttpUrl, field_validator
 # ---------------------------------------------------------------------------
 class ViolationSchema(BaseModel):
     id: str
-    type: str  # foreign_word | visual_dominance | no_russian_dub | unrecognized_word | trademark | possible_trademark
+    type: str  # foreign_word | no_russian_dub | unrecognized_word | trademark | possible_trademark
     page_url: str | None = None
     text_context: str = ""
     word: str | None = None
     normal_form: str | None = None
-    visual_weight_foreign: float | None = None
-    visual_weight_rus: float | None = None
     details: dict[str, Any] = Field(default_factory=dict)
 
     model_config = {"from_attributes": True}
@@ -72,6 +70,7 @@ class ScanSummary(BaseModel):
 
 class ScanStatusResponse(BaseModel):
     status: str
+    target_url: str | None = None
     summary: ScanSummary
     pages: list[PageSchema] = Field(default_factory=list)
     violations: list[ViolationSchema] = Field(default_factory=list)

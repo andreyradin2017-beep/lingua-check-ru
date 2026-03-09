@@ -6,6 +6,7 @@ import html
 import logging
 import re
 import unicodedata
+from functools import lru_cache
 
 import pymorphy3 as pymorphy2
 
@@ -15,7 +16,13 @@ logger = logging.getLogger(__name__)
 _morph = pymorphy2.MorphAnalyzer()
 
 # Паттерн: символы кириллицы или латиницы (слова). Теперь разрешаем дефис внутри слова.
-_WORD_RE = re.compile(r"[A-Za-zА-Яа-яЁё]+(?:-[A-Za-zА-Яа-яЁё]+)*", re.UNICODE)
+_WORD_RE = re.compile(r"[A-Za-zА-Яа-яЁё0-9]+(?:-[A-Za-zА-Яа-яЁё0-9]+)*", re.UNICODE)
+
+# Кэш для морфологического анализа (10000 слов)
+@lru_cache(maxsize=10000)
+def _analyze_word_cached(word: str):
+    """Кэшированный морфологический анализ слова."""
+    return _morph.parse(word)
 
 
 def detect_language(word: str) -> str:
@@ -57,7 +64,8 @@ def tokenize(text: str) -> list[dict]:
         lang = detect_language(raw)
 
         if lang == "ru":
-            parsed = _morph.parse(raw)
+            # Используем кэшированный анализ
+            parsed = _analyze_word_cached(raw)
             best = parsed[0] if parsed else None
             normal_form = best.normal_form if best else raw.lower()
             pos = pos_to_str(best.tag.POS if best else None)

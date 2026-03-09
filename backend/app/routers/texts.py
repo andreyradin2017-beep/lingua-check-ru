@@ -1,6 +1,8 @@
 import logging
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -10,22 +12,34 @@ from app.services.token_service import analyze_text
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 ALLOWED_EXTENSIONS = {"txt", "docx", "pdf"}
 
 
 @router.post("/check_text", response_model=CheckTextResponse)
+@limiter.limit("10/minute")  # Максимум 10 проверок текста в минуту
 async def check_text(
+    request: Request,
     body: CheckTextRequest,
 ) -> CheckTextResponse:
     """specs/api.md — POST /api/v1/check_text"""
+    # Лимит размера текста (1 млн символов ≈ 1 МБ)
+    if len(body.text) > 1_000_000:
+        raise HTTPException(
+            status_code=413,
+            detail="Текст слишком большой (максимум 1 000 000 символов)",
+        )
+    
     logger.info("check_text: %d символов, format=%s", len(body.text), body.format)
     result = await analyze_text(body.text)
     return result
 
 
 @router.post("/check_text/upload", response_model=CheckTextResponse)
+@limiter.limit("5/minute")  # Максимум 5 загрузок файлов в минуту
 async def check_text_upload(
+    request: Request,
     file: UploadFile = File(...),
 ) -> CheckTextResponse:
     """Загрузка файла (TXT/DOCX/PDF) для проверки. specs/security.md."""
@@ -57,17 +71,21 @@ async def check_text_upload(
 
 def _extract_text(content: bytes, ext: str) -> str:
     """Извлечение текста из файла."""
-    if ext == "txt":
-        return content.decode("utf-8", errors="replace")
-    if ext == "docx":
-        import io
-        from docx import Document  # type: ignore
+    try:
+        if ext == "txt":
+            return content.decode("utf-8", errors="replace")
+        if ext == "docx":
+            import io
+            from docx import Document  # type: ignore
 
-        doc = Document(io.BytesIO(content))
-        return "\n".join(para.text for para in doc.paragraphs)
-    if ext == "pdf":
-        import io
-        from pdfminer.high_level import extract_text as pdf_extract  # type: ignore
+            doc = Document(io.BytesIO(content))
+            return "\n".join(para.text for para in doc.paragraphs)
+        if ext == "pdf":
+            import io
+            from pdfminer.high_level import extract_text as pdf_extract  # type: ignore
 
-        return pdf_extract(io.BytesIO(content))
+            return pdf_extract(io.BytesIO(content))
+    except Exception as e:
+        logger.error("Failed to extract text from file (ext=%s): %s", ext, e)
+        raise HTTPException(status_code=422, detail=f"Не удалось извлечь текст из файла: {str(e)}")
     return ""

@@ -1,6 +1,21 @@
 {
   "version": 1,
   "skills": {
+    "code-review-quality": {
+      "source": "proffesor-for-testing/agentic-qe",
+      "sourceType": "github",
+      "computedHash": "70ff4a1d6320628a87c3a0d60e63b2bdc0e063127e00f666380f4eff2b7440a1"
+    },
+    "compatibility-testing": {
+      "source": "proffesor-for-testing/agentic-qe",
+      "sourceType": "github",
+      "computedHash": "0946a7c0e7828ae62e31133dbef28f47b2f73ea03409b2b0e19eb67dcd81f163"
+    },
+    "playwright-skill": {
+      "source": "testdino-hq/playwright-skill",
+      "sourceType": "github",
+      "computedHash": "984e9d3f8de2b1fbdb1d7c5ffb715b919d0eb31e0cebebc7150a57170ae862e6"
+    },
     "rest-api-design": {
       "source": "aj-geddes/useful-ai-prompts",
       "sourceType": "github",
