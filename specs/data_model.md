@@ -76,10 +76,11 @@
 - `token_id` (FK → tokens.id, nullable)
 - `page_id` (FK → pages.id, nullable)
 - `text_id` (FK, nullable)
-- `type` (text: "foreign_word" | "visual_dominance" | "no_russian_dub" | "unrecognized_word" | "trademark" | "possible_trademark")
+- `type` (text: "foreign_word" | "no_russian_dub" | "unrecognized_word" | "trademark" | "possible_trademark")
 - `details` (JSONB)
 - `created_at` (timestamp)
 - `idx_violations_page_id` on (`page_id`)
+- `idx_violations_text_id` on (`text_id`)
 
 ---
 

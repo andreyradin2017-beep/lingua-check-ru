@@ -102,14 +102,12 @@ Response:
 ### Violation
 
 - `id`: string
-- `type`: "foreign_word" | "visual_dominance" | "no_russian_dub" | "unrecognized_word" | "trademark" | "possible_trademark"
+- `type`: "foreign_word" | "no_russian_dub" | "unrecognized_word" | "trademark" | "possible_trademark"
 - `page_url`: string | null
 - `text_context`: string
 - `word`: string | null
 - `normal_form`: string | null
-- `visual_weight_foreign`: float | null
-- `visual_weight_rus`: float | null
-- `details`: object (произвольные поля: selector, css, screenshot_path, etc.)
+- `details`: object (произвольные поля: screenshot_path, language, etc.)
 
 ---
 
