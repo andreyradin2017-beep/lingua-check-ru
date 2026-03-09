@@ -1,62 +1,84 @@
-import { OfflineIndicator } from "@components/OfflineIndicator";
-import { useSearchProviders } from "@hooks/useSearchProviders";
-import { Outlet, ScrollRestoration } from "react-router-dom";
-import { useState, useEffect } from "react";
-import { SplashScreen } from "@components/SplashScreen";
-import { getDiscoverData } from "@services/discover";
-import { db } from "@db/db";
+import { AppShell, Burger, Group, NavLink, Title, Text, Container } from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { IconGlobe, IconFileText, IconBooks, IconHome, IconSearch, IconHistory, IconX } from '@tabler/icons-react';
 
-function App() {
-  const [initialized, setInitialized] = useState(false);
-  const [showSplash, setShowSplash] = useState(true);
+// Импортируем страницы (создадим их следом)
+import HomePage from './pages/HomePage';
+import ScanPage from './pages/ScanPage';
+import TextPage from './pages/TextPage';
+import DictionaryPage from './pages/DictionaryPage';
+import ExceptionsPage from './pages/ExceptionsPage';
+import HistoryPage from './pages/HistoryPage';
+import NotFoundPage from './pages/NotFoundPage';
 
-  // Initialize search providers on first load
-  useSearchProviders();
+export default function App() {
+  const [opened, { toggle }] = useDisclosure();
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  useEffect(() => {
-    const minSplashTime = 2000; // Exact 2 seconds per user request
-    const startTime = Date.now();
-
-    // Fire off background requests to warm up caches
-    const prefetchData = async () => {
-      try {
-        await Promise.allSettled([
-          getDiscoverData(),
-          db.items.toArray()
-        ]);
-        setInitialized(true);
-      } catch (e) {
-        console.error("Prefetch failed", e);
-        setInitialized(true); // Still initialize even if prefetch fails
-      }
-    };
-
-    prefetchData();
-
-    // Hide splash screen after exactly 2 seconds
-    const checkSplashTimer = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      if (elapsed >= minSplashTime) {
-        setShowSplash(false);
-        clearInterval(checkSplashTimer);
-      }
-    }, 100);
-
-    return () => clearInterval(checkSplashTimer);
-  }, []);
+  const navItems = [
+    { label: 'Главная', icon: <IconHome size="1rem" />, path: '/' },
+    { label: 'История', icon: <IconHistory size="1rem" />, path: '/history' },
+    { label: 'Сайты', icon: <IconGlobe size="1rem" />, path: '/scans' },
+    { label: 'Текст и файлы', icon: <IconFileText size="1rem" />, path: '/text' },
+    { label: 'Словари', icon: <IconBooks size="1rem" />, path: '/dictionaries' },
+    { label: 'Исключения', icon: <IconX size="1rem" />, path: '/exceptions' },
+  ];
 
   return (
-    <>
-      <SplashScreen isVisible={showSplash} />
-      {(!showSplash && initialized) && (
-        <>
-          <OfflineIndicator />
-          <ScrollRestoration />
-          <Outlet />
-        </>
-      )}
-    </>
+    <AppShell
+      header={{ height: 60 }}
+      navbar={{
+        width: 300,
+        breakpoint: 'sm',
+        collapsed: { mobile: !opened },
+      }}
+      padding="md"
+    >
+      <AppShell.Header>
+        <Group h="100%" px="md">
+          <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
+          <IconSearch color="var(--mantine-color-blue-6)" size={28} />
+          <Title order={3} className="gradient-text">LinguaCheck RU</Title>
+          <Text size="xs" c="dimmed" ml="auto">ФЗ №168‑ФЗ</Text>
+        </Group>
+      </AppShell.Header>
+
+      <AppShell.Navbar p="md">
+        {navItems.map((item) => (
+          <NavLink
+            key={item.path}
+            // FIX #3: Добавлен aria-label для навигации
+            aria-label={`Перейти на страницу ${item.label}`}
+            label={item.label}
+            leftSection={item.icon}
+            active={location.pathname === item.path}
+            onClick={() => {
+              navigate(item.path);
+              if (opened) toggle();
+            }}
+            variant="light"
+            styles={{
+              label: { fontSize: '1rem', fontWeight: 500 }
+            }}
+          />
+        ))}
+      </AppShell.Navbar>
+
+      <AppShell.Main bg="gray.0">
+        <Container size="xl" py="lg">
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/scans" element={<ScanPage />} />
+            <Route path="/history" element={<HistoryPage />} />
+            <Route path="/text" element={<TextPage />} />
+            <Route path="/dictionaries" element={<DictionaryPage />} />
+            <Route path="/exceptions" element={<ExceptionsPage />} />
+            <Route path="*" element={<NotFoundPage />} />
+          </Routes>
+        </Container>
+      </AppShell.Main>
+    </AppShell>
   );
 }
-
-export default App;

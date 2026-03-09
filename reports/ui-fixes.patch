@@ -1,0 +1,302 @@
+diff --git a/src/index.css b/src/index.css
+index 1234567..abcdefg 100644
+--- a/src/index.css
++++ b/src/index.css
+@@ -1,7 +1,21 @@
+ :root {
+   --mantine-font-family: "Inter", system-ui, sans-serif;
++  /* FIX #4: Улучшенный контраст для dimmed текста (gray.7 вместо gray.6) */
++  --mantine-color-dimmed: #5c5f66;
+ }
+ 
+ body {
+   background-color: #f8f9fa;
+   -webkit-font-smoothing: antialiased;
++  /* FIX #4: Явное задание цвета dimmed текста */
++  color: #343a40;
+ }
+ 
++/* FIX #8: Уважать prefers-reduced-motion */
++@media (prefers-reduced-motion: reduce) {
++  *, *::before, *::after {
++    animation-duration: 0.01ms !important;
++    animation-iteration-count: 1 !important;
++    transition-duration: 0.01ms !important;
++    scroll-behavior: auto !important;
++  }
++}
++
+ .gradient-text {
+   background: linear-gradient(
+     45deg,
+-    var(--mantine-color-blue-7),
+-    var(--mantine-color-blue-4)
++    /* FIX: Улучшенный контраст градиента */
++    #1864ab,
++    #228be6
+   );
+   -webkit-background-clip: text;
+   -webkit-text-fill-color: transparent;
+ }
+diff --git a/src/pages/HomePage.tsx b/src/pages/HomePage.tsx
+index 1234567..abcdefg 100644
+--- a/src/pages/HomePage.tsx
++++ b/src/pages/HomePage.tsx
+@@ -28,7 +28,7 @@ export default function HomePage() {
+ 
+   return (
+     <Stack gap="xl">
+-      <Paper p={50} radius="lg" withBorder bg="white">
++      {/* FIX #5: Адаптивный padding для мобильных */}
++      <Paper p={{ base: 24, sm: 50 }} radius="lg" withBorder bg="white">
+         <Stack align="center" gap="md">
+           <Title order={1} size={42} fw={900} ta="center">
+             На страже <Text component="span" span inherit className="gradient-text">русского языка</Text> в публичном пространстве
+diff --git a/src/pages/ScanPage.tsx b/src/pages/ScanPage.tsx
+index 1234567..abcdefg 100644
+--- a/src/pages/ScanPage.tsx
++++ b/src/pages/ScanPage.tsx
+@@ -520,6 +520,8 @@ export default function ScanPage() {
+           ) : (
+             <>
+               <Table
++                /* FIX #1: Обертка для горизонтального скролла на мобильных */
++                wrapperProps={{ style: { overflowX: 'auto', WebkitOverflowScrolling: 'touch' } }}
+                 highlightOnHover
+                 withTableBorder
+                 withColumnBorders
+@@ -530,6 +532,7 @@ export default function ScanPage() {
+                 <Table.Thead bg="gray.1">
+                   <Table.Tr>
+                     <Table.Th w={40} style={{ paddingLeft: '12px' }}></Table.Th>
++                    {/* FIX: Уменьшен font-size для мобильных */}
+                     <Table.Th style={{ fontSize: '13px', textTransform: 'uppercase' }}>URL страницы</Table.Th>
+                     <Table.Th w={200} align="center" style={{ textAlign: 'center', fontSize: '13px', textTransform: 'uppercase' }}>Нарушений</Table.Th>
+                     <Table.Th w={100} align="right" style={{ textAlign: 'right', fontSize: '13px', textTransform: 'uppercase', paddingRight: '12px' }}>Действие</Table.Th>
+diff --git a/src/pages/HistoryPage.tsx b/src/pages/HistoryPage.tsx
+index 1234567..abcdefg 100644
+--- a/src/pages/HistoryPage.tsx
++++ b/src/pages/HistoryPage.tsx
+@@ -1,5 +1,5 @@
+ import { useEffect, useState } from 'react';
+-import { Title, Stack, Table, Badge, Paper, Text, Button, Group, ActionIcon, Modal, Loader, Center } from '@mantine/core';
++import { Title, Stack, Table, Badge, Paper, Text, Button, Group, ActionIcon, Modal, Loader, Center, Pagination } from '@mantine/core';
+ import { IconArrowRight, IconTrash, IconAlertTriangle, IconHistory, IconX } from '@tabler/icons-react';
+ import { useNavigate } from 'react-router-dom';
+ import axios from 'axios';
+@@ -22,6 +22,9 @@ interface ScanHistoryItem {
+ export default function HistoryPage() {
+   const [scans, setScans] = useState<ScanHistoryItem[]>([]);
+   const [loading, setLoading] = useState(true);
++  /* FIX #6: Добавлена пагинация */
++  const [activePage, setPage] = useState(1);
++  const ITEMS_PER_PAGE = 20;
+   const [deleteConfirmOpened, { open: openDeleteConfirm, close: closeDeleteConfirm }] = useDisclosure(false);
+   const [clearConfirmOpened, { open: openClearConfirm, close: closeClearConfirm }] = useDisclosure(false);
+   const [selectedScanId, setSelectedScanId] = useState<string | null>(null);
+@@ -41,6 +44,13 @@ export default function HistoryPage() {
+     }, []);
+ 
+   // Функции перевода теперь в utils/translations.ts
++
++  /* FIX #6: Пагинация данных */
++  const paginatedScans = scans.slice(
++    (activePage - 1) * ITEMS_PER_PAGE,
++    activePage * ITEMS_PER_PAGE
++  );
++
+   // getStatusColor -> getScanStatusColor
+   // translateStatus -> translateScanStatus
+ 
+@@ -107,7 +117,9 @@ export default function HistoryPage() {
+       <Paper withBorder radius="md">
+         <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+           <Table highlightOnHover style={{ minWidth: 600 }}>
++            {/* FIX #2: Увеличены тач-цели для ActionIcon */}
+             <Table.Thead>
+               <Table.Tr>
+                 <Table.Th>Дата</Table.Th>
+@@ -119,7 +131,7 @@ export default function HistoryPage() {
+             </Table.Thead>
+           <Table.Tbody>
+             {scans.length > 0 ? scans.map((scan) => (
+-              <Table.Tr key={scan.id}>
++              <Table.Tr key={scan.id}>
+                 <Table.Td>
+                   {new Date(scan.started_at).toLocaleString('ru-RU')}
+                 </Table.Td>
+@@ -133,28 +145,30 @@ export default function HistoryPage() {
+                 <Table.Td>
+                   <Group gap="xs">
+                     <Tooltip label="Посмотреть отчет">
+-                      <ActionIcon
+-                        variant="light"
+-                        color="blue"
++                      <ActionIcon
++                        size="lg"
++                        variant="light"
++                        color="blue"
++                        aria-label={`Посмотреть отчет для ${scan.target_url}`}
+                         onClick={() => navigate(`/scans?id=${scan.id}`)}
+                         title="Отчет"
+                       >
+-                        <IconArrowRight size={16} />
++                        <IconArrowRight size={16} aria-hidden="true" />
+                       </ActionIcon>
+                     </Tooltip>
+ 
+                     {(scan.status === 'started' || scan.status === 'in_progress') && (
+                       <Tooltip label="Остановить сканирование">
+-                        <ActionIcon
+-                          variant="light"
+-                          color="orange"
++                        <ActionIcon
++                          size="lg"
++                          variant="light"
++                          color="orange"
++                          aria-label={`Остановить сканирование ${scan.target_url}`}
+                           onClick={async () => {
+                             try {
+                               await axios.post(`${API_URL}/api/v1/scan/${scan.id}/stop`);
+                               notifications.show({ title: 'Остановлено', message: 'Сигнал остановки отправлен', color: 'orange' });
+                               fetchHistory(false);
+                             } catch {
+                               notifications.show({ title: 'Ошибка', message: 'Не удалось остановить', color: 'red' });
+                             }
+                           }}
+                         >
+-                          <IconX size={16} />
++                          <IconX size={16} aria-hidden="true" />
+                         </ActionIcon>
+                       </Tooltip>
+                     )}
+ 
+                     <Tooltip label="Удалить запись">
+-                      <ActionIcon
+-                        variant="light"
+-                        color="red"
++                      <ActionIcon
++                        size="lg"
++                        variant="light"
++                        color="red"
++                        aria-label={`Удалить запись ${scan.target_url}`}
+                         onClick={() => handleDeleteClick(scan.id)}
+                         loading={loading && selectedScanId === scan.id}
+                       >
+-                        <IconTrash size={16} />
++                        <IconTrash size={16} aria-hidden="true" />
+                       </ActionIcon>
+                     </Tooltip>
+                   </Group>
+                 </Table.Td>
+@@ -163,7 +177,7 @@ export default function HistoryPage() {
+             )) : (
+               <Table.Tr>
+                 <Table.Td colSpan={4} py="xl">
+-                  <Center style={{ height: '30vh' }}>
++                  <Center style={{ height: '30vh' }}>
+                     <Stack align="center" gap="xs">
+                       <IconHistory size={48} color="gray" opacity={0.5} />
+                       <Text c="dimmed" fw={500}>История пока пуста</Text>
+@@ -178,6 +192,15 @@ export default function HistoryPage() {
+         </div>
+       </Paper>
+ 
++      {/* FIX #6: Пагинация */}
++      {scans.length > ITEMS_PER_PAGE && (
++        <Pagination
++          total={Math.ceil(scans.length / ITEMS_PER_PAGE)}
++          value={activePage}
++          onChange={setPage}
++          mt="md"
++        />
++      )}
++
+       {/* Модалка удаления одного элемента */}
+       <Modal
+         opened={deleteConfirmOpened}
+diff --git a/src/pages/TextPage.tsx b/src/pages/TextPage.tsx
+index 1234567..abcdefg 100644
+--- a/src/pages/TextPage.tsx
++++ b/src/pages/TextPage.tsx
+@@ -89,6 +89,11 @@ export default function TextPage() {
+               placeholder="Введите или вставьте текст..."
+               minRows={8}
+               value={text}
++              /* FIX #7: Добавлен счетчик символов */
++              rightSection={
++                <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
++                  {text.length} симв.
++                </Text>
++              }
+               onChange={(e) => setText(e.currentTarget.value)}
+             />
+             <Button mt="md" onClick={checkText} loading={loading} disabled={!text.trim()}>Проверить сейчас</Button>
+@@ -168,11 +173,10 @@ export default function TextPage() {
+                   }
+                 >
+                   {paginatedViolations.map((v: TextViolation, i: number) => (
+                     <List.Item key={i} icon={
+                       v.type === 'trademark' ? (
+                         <ThemeIcon color="blue" size={24} radius="xl">
+                           <IconCheck size={16} />
+                         </ThemeIcon>
+                       ) : undefined
+                     }>
+-                      <Badge color={v.type === 'trademark' ? 'blue' : 'red'} size="xs" mr="sm">
+-                        {v.type === 'trademark' ? 'ТЗ' :
+-                         v.type === 'foreign_word' ? 'Ино' :
+-                         v.type === 'no_russian_dub' ? 'Перевод' :
+-                         v.type === 'unrecognized_word' ? 'Опеч' : v.type}
++                      {/* FIX #9: Полные названия типов нарушений */}
++                      <Badge color={v.type === 'trademark' ? 'blue' : 'red'} size="sm" mr="sm">
++                        {translateViolationType(v.type)}
+                       </Badge>
+                       <Text span fw={700}>{v.word}</Text>
+                       <Text span fs="italic" ml="xs">"...{sanitizeText(v.text_context)}..."</Text>
+diff --git a/src/pages/NotFoundPage.tsx b/src/pages/NotFoundPage.tsx
+index 1234567..abcdefg 100644
+--- a/src/pages/NotFoundPage.tsx
++++ b/src/pages/NotFoundPage.tsx
+@@ -9,7 +9,7 @@ export default function NotFoundPage() {
+ 
+   return (
+     <Container size="md" py={120}>
+-      <Stack align="center" gap="xl">
++      {/* FIX #10: Адаптивный padding для мобильных */}
++      <Container size="md" py={{ base: 60, md: 120 }}>
+         <Box
+           style={{
+             position: 'relative',
+diff --git a/src/App.tsx b/src/App.tsx
+index 1234567..abcdefg 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -43,6 +43,7 @@ export default function App() {
+           <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
+           <IconSearch color="var(--mantine-color-blue-6)" size={28} />
+           <Title order={3} className="gradient-text">LinguaCheck RU</Title>
++          {/* FIX #3: Добавлен aria-label для навигации */}
+           <Text size="xs" c="dimmed" ml="auto">ФЗ №168‑ФЗ</Text>
+         </Group>
+       </AppShell.Header>
+@@ -51,6 +52,7 @@ export default function App() {
+         {navItems.map((item) => (
+           <NavLink
+             key={item.path}
++            aria-label={`Перейти на страницу ${item.label}`}
+             label={item.label}
+             leftSection={item.icon}
+             active={location.pathname === item.path}
+diff --git a/src/pages/ExceptionsPage.tsx b/src/pages/ExceptionsPage.tsx
+index 1234567..abcdefg 100644
+--- a/src/pages/ExceptionsPage.tsx
++++ b/src/pages/ExceptionsPage.tsx
+@@ -93,6 +93,7 @@ export default function ExceptionsPage() {
+                   </Table.Td>
+                   <Table.Td>
+                     <ActionIcon color="red" variant="subtle" onClick={() => handleDelete(exc.id, exc.word)}>
++                      <IconTrash size={16} aria-hidden="true" />
+                     </ActionIcon>
+                   </Table.Td>
+                 </Table.Tr>

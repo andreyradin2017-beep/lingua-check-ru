@@ -1,8 +1,8 @@
 import logging
 import time
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from app.schemas import DictionaryPreviewResponse, DictionaryVersionSchema
-from app.supabase_client import supabase
+from app.supabase_client import get_async_supabase
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -14,11 +14,21 @@ _CACHE = {
 }
 CACHE_TTL = 3600  # 1 час
 
+
+@router.get("/dictionary_preview/invalidate")
+async def invalidate_dictionary_cache():
+    """Принудительная инвалидация кэша словарей."""
+    global _CACHE
+    _CACHE["data"] = None
+    _CACHE["timestamp"] = 0
+    logger.info("Dictionary cache invalidated")
+    return {"status": "cache invalidated"}
+
 @router.get("/dictionary_preview", response_model=DictionaryPreviewResponse)
-def dictionary_preview() -> DictionaryPreviewResponse:
+async def dictionary_preview() -> DictionaryPreviewResponse:
     """specs/api.md — GET /api/v1/dictionary_preview
     Используем кэширование, так как подсчет слов в 100к+ записях через REST API медленный."""
-    
+
     now = time.time()
     if _CACHE["data"] and (now - _CACHE["timestamp"] < CACHE_TTL):
         logger.info("dictionary_preview: returning cached result")
@@ -26,12 +36,13 @@ def dictionary_preview() -> DictionaryPreviewResponse:
 
     try:
         # 1. Получаем список версий словарей
-        resp = supabase.table("dictionary_versions").select("*").execute()
+        client = await get_async_supabase()
+        resp = await client.table("dictionary_versions").select("*").execute()
         versions = resp.data
-        
+
         result = []
         logger.info("dictionary_preview REST API: Найдено %d версий", len(versions))
-        
+
         for dv in versions:
             # Временно отключаем подсчет слов через API, так как Count запросы на больших
             # таблицах в Supabase (Free Tier) регулярно отваливаются по таймауту и вешают фронтенд.
@@ -43,7 +54,7 @@ def dictionary_preview() -> DictionaryPreviewResponse:
                 word_count = 121193
             elif dv["name"] == "Orthoepic":
                 word_count = 55408
-                
+
             result.append(
                 DictionaryVersionSchema(
                     name=dv["name"],
@@ -53,11 +64,11 @@ def dictionary_preview() -> DictionaryPreviewResponse:
             )
 
         response_data = DictionaryPreviewResponse(dictionary_versions=result)
-        
+
         # Обновляем кэш
         _CACHE["data"] = response_data
         _CACHE["timestamp"] = now
-        
+
         logger.info("dictionary_preview REST API complete (and cached)")
         return response_data
     except Exception as e:

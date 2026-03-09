@@ -197,7 +197,7 @@ class Violation(Base):
     text_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     type: Mapped[str] = mapped_column(
         String(30), nullable=False
-    )  # foreign_word/visual_dominance/no_russian_dub
+    )  # foreign_word/no_russian_dub/unrecognized_word/trademark
     details: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
@@ -206,4 +206,21 @@ class Violation(Base):
     token: Mapped["Token | None"] = relationship("Token", back_populates="violations")
     page: Mapped["Page | None"] = relationship("Page", back_populates="violations")
 
-    __table_args__ = (Index("idx_violations_page_id", "page_id"),)
+    __table_args__ = (
+        Index("idx_violations_page_id", "page_id"),
+        Index("idx_violations_text_id", "text_id"),
+        Index("idx_violations_page_type", "page_id", "type"),  # C3: для быстрой фильтрации по типу
+    )
+
+
+# ---------------------------------------------------------------------------
+# 9. global_exceptions
+# ---------------------------------------------------------------------------
+class GlobalException(Base):
+    __tablename__ = "global_exceptions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
+    word: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )

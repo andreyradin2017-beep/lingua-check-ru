@@ -12,12 +12,14 @@ logger = logging.getLogger(__name__)
 _NORMATIVE_DICTS = {"Orthographic", "Orthoepic", "Explanatory", "ForeignWords"}
 
 # Исключения: общепринятые сокращения, бренды и т.д. (нижний регистр)
-_EXCEPTIONS = {
+_STATIC_EXCEPTIONS = {
     "обл", "респ", "ул", "д", "г", "стр", "оф", "кв", "м", "т", "тел", 
     "ао", "ооо", "пао", "зао", "тм", "ип", "инн", "кпп", "огрн",
     "email", "info", "melkom", "tm", "ru", "en", "текат", "текарт", 
     "cookie", "cookies", "yandex", "smartcaptcha", "buher", "buhler", "pavan", "nbsp"
 }
+
+_ROMAN_RE = re.compile(r"^[IVXLCDM]+$", re.IGNORECASE)
 
 
 def _get_technical_word_parts(text: str) -> set[str]:
@@ -54,10 +56,18 @@ async def _load_batch_data(tokens: list[dict], client: any = None) -> tuple[dict
     if not unique_nfs:
         return {}, set()
 
-    unique_nfs_list = list(unique_nfs)
     words_sources: dict[str, set[str]] = {}
     trademarks_set: set[str] = set()
+    global_exceptions: set[str] = set()
     
+    # Загружаем глобальные исключения
+    try:
+        ge_resp = await client.table("global_exceptions").select("word").execute()
+        for item in ge_resp.data:
+            global_exceptions.add(item["word"].lower())
+    except Exception as e:
+        logger.error("Error loading global_exceptions: %s", e)
+
     # Чанкуем запросы по 200 элементов, чтобы не превысить лимит URL/памяти Postgrest
     chunk_size = 200
     for i in range(0, len(unique_nfs_list), chunk_size):
@@ -83,7 +93,38 @@ async def _load_batch_data(tokens: list[dict], client: any = None) -> tuple[dict
         except Exception as e:
             logger.error("Error loading trademarks chunk: %s", e)
 
-    return words_sources, trademarks_set
+    return words_sources, trademarks_set, global_exceptions
+
+
+def _is_anglicism(word: str) -> bool:
+    """
+    Эвристически определяет, является ли кириллическое слово англицизмом (заимствованием).
+    """
+    # Характерные суффиксы и окончания англицизмов
+    suffixes = [
+        r"стайл$", r"инг$", r"мен$", r"мент$", r"ер$", r"ор$", r"изация$", 
+        r"ировать$", r"бел$", r"бук$", r"каст$", r"хаб$", r"ток$", r"плей$", 
+        r"шоп$", r"мол$", r"ворк$", r"бокс$", r"стор$", r"ап$", r"даун$",
+        r"кей$", r"сет$", r"фит$", r"фуд$", r"чат$"
+    ]
+    # Характерные корни/целые слова (минимум 4 символа, чтобы не бить по коротким русским)
+    roots = [
+        "лайф", "маркет", "менедж", "бренд", "тренд", "хайп", "дедлайн", 
+        "кейс", "релиз", "апдейт", "фейк", "чек", "оффер", "профит", 
+        "стартап", "юзер", "контент", "холдинг", "шоу", "бизнес", "дизайн"
+    ]
+    
+    w = word.lower()
+    if any(re.search(s, w) for s in suffixes):
+        return True
+    if any(r in w for r in roots):
+        return True
+    return False
+
+
+def _is_roman_numeral(word: str) -> bool:
+    """Проверяет, является ли слово римской цифрой."""
+    return bool(_ROMAN_RE.match(word))
 
 
 async def analyze_text(text: str, client: any = None) -> CheckTextResponse:
@@ -99,11 +140,8 @@ async def analyze_text(text: str, client: any = None) -> CheckTextResponse:
     tokens = tokenize(text)
     violations: list[ViolationSchema] = []
 
-    # Есть ли в тексте русские слова (для определения no_russian_dub)
-    has_russian = any(t["language_hint"] == "ru" for t in tokens)
-
     # Предварительно загружаем данные обо всех токенах одним батчем через REST
-    words_sources, trademarks_set = await _load_batch_data(tokens, client)
+    words_sources, trademarks_set, db_exceptions = await _load_batch_data(tokens, client)
 
     for token in tokens:
         lang = token["language_hint"]
@@ -114,11 +152,16 @@ async def analyze_text(text: str, client: any = None) -> CheckTextResponse:
             continue
 
         # --- Пропускаем исключения ---
-        # а) Глобальные исключения и Email/URL компоненты
-        if normal_form.lower() in _EXCEPTIONS or normal_form.lower() in tech_exceptions:
+        # а) Статические, динамические (из БД) и технические (Email/URL) исключения
+        nf_low = normal_form.lower()
+        if nf_low in _STATIC_EXCEPTIONS or nf_low in db_exceptions or nf_low in tech_exceptions:
             continue
             
-        # б) Одиночные кириллические буквы (сокращения р-з, инициалы и т.д.)
+        # б) Римские цифры (I, V, X, L, C, D, M)
+        if _is_roman_numeral(raw_text):
+            continue
+
+        # в) Одиночные кириллические буквы (сокращения р-з, инициалы и т.д.)
         if lang == "ru" and len(raw_text) == 1:
             continue
 
@@ -128,19 +171,8 @@ async def analyze_text(text: str, client: any = None) -> CheckTextResponse:
         end = min(len(text), idx + len(raw_text) + 40)
         context = text[start:end].strip()
 
-        # Товарный знак (проверка O(1) по in-memory сету загруженному в начале)
+        # Товарный знак (пропускаем - это не нарушение)
         if normal_form in trademarks_set:
-            violations.append(
-                ViolationSchema(
-                    id=str(uuid.uuid4()),
-                    type="trademark",
-                    page_url=None,
-                    text_context=context,
-                    word=raw_text,
-                    normal_form=normal_form,
-                    details={"language": lang},
-                )
-            )
             continue
 
         # Получаем источники (O(1) чтение из in-memory словаря)
@@ -153,26 +185,34 @@ async def analyze_text(text: str, client: any = None) -> CheckTextResponse:
         if lang == "ru":
             if not sources:
                 if not token.get("is_known", False):
+                    # Эвристика: англицизм или опечатка?
+                    v_type = "unrecognized_word"
+                    v_info = "Опечатка или неизвестное слово"
+                    
+                    if _is_anglicism(normal_form):
+                        v_type = "foreign_word"
+                        v_info = "Иностранное заимствование (англицизм) на кириллице"
+                    
                     violations.append(
                         ViolationSchema(
                             id=str(uuid.uuid4()),
-                            type="unrecognized_word",
+                            type=v_type,
                             page_url=None,
                             text_context=context,
                             word=raw_text,
                             normal_form=normal_form,
-                            details={"language": lang, "info": "Опечатка или неизвестное слово"},
+                            details={"language": lang, "info": v_info},
                         )
                     )
             continue
 
-        # Иностранные слова
+        # Иностранные слова (латиница)
         if len(raw_text) == 1 and lang == "en":
             continue
         if sources:
             continue
 
-        v_type = "no_russian_dub" if not has_russian else "foreign_word"
+        v_type = "foreign_word"
         if raw_text[0].isupper():
             v_type = "possible_trademark"
             
@@ -189,8 +229,7 @@ async def analyze_text(text: str, client: any = None) -> CheckTextResponse:
         )
 
     total = len(tokens)
-    real_violations = [v for v in violations if v.type != "trademark"]
-    viol_count = len(real_violations)
+    viol_count = len(violations)
     compliance = round((1 - viol_count / total) * 100, 2) if total > 0 else 100.0
 
     return CheckTextResponse(
