@@ -8,11 +8,11 @@ services:
     dockerContext: backend
     envVars:
       - key: DATABASE_URL
-        sync: false
+        value: "postgresql+asyncpg://postgres.tefpshqwdlpzohcldayr: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@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?ssl=require"
       - key: SUPABASE_URL
-        sync: false
+        value: "https://tefpshqwdlpzohcldayr.supabase.co"
       - key: SUPABASE_KEY
-        sync: false
+        value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRlZnBzaHF3ZGxwem9oY2xkYXlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjgxODQyOSwiZXhwIjoyMDg4Mzk0NDI5fQ.y014Ojsi8d65faV_sazRa1ICW8f0UQNQugpPdn5bOvc"
       - key: CORS_ORIGINS
         value: '["*"]'
       - key: MAX_DEPTH_LIMIT
