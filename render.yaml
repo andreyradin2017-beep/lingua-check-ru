@@ -5,7 +5,7 @@ services:
     env: python
     region: frankfurt # Ближе к РФ
     plan: free
-    dockerFilePath: ./backend/Dockerfile
+    dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     envVars:
       - key: DATABASE_URL
