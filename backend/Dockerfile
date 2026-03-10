@@ -1,8 +1,8 @@
 # Используем официальный образ Python
 FROM python:3.12-slim
 
-# Устанавливаем системные зависимости для Playwright и работы с PDF
-RUN apt-get update && apt-get install -y \
+# Устанавливаем системные зависимости
+RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     gnupg \
     libnss3 \
@@ -23,6 +23,8 @@ RUN apt-get update && apt-get install -y \
     libasound2 \
     tesseract-ocr \
     tesseract-ocr-rus \
+    ca-certificates \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Устанавливаем рабочую директорию
