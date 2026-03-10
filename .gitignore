@@ -68,3 +68,5 @@ single_test.txt
 !pytest.ini
 !backend/pytest.ini
 !LICENSE*
+
+.vercel
