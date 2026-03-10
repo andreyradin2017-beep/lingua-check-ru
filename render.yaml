@@ -4,8 +4,8 @@ services:
     runtime: docker
     region: frankfurt # Ближе к РФ
     plan: free
-    dockerfilePath: Dockerfile
-    dockerContext: backend
+    dockerfilePath: backend/Dockerfile
+    dockerContext: .
     envVars:
       - key: DATABASE_URL
         value: "postgresql+asyncpg://postgres.tefpshqwdlpzohcldayr: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@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?ssl=require"
