@@ -1,5 +1,5 @@
 import logging
-import sys # trigger reload
+import sys
 import asyncio
 import os
 from contextlib import asynccontextmanager
@@ -31,8 +31,6 @@ limiter = Limiter(key_func=get_remote_address)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting LinguaCheck-RU backend...")
-    static_dir = "static" if os.path.exists("static") else "backend/static"
-    os.makedirs(os.path.join(static_dir, "screenshots"), exist_ok=True)
     # Таблицы уже созданы в Supabase. Интроспекция (create_all)
     # через PgBouncer Transaction Mode приводит к ошибкам.
     logger.info("Database tables ensured (skipped DDL via pooler).")
@@ -69,10 +67,6 @@ async def global_exception_handler(request: Request, exc: Exception):
         status_code=500,
         content={"detail": str(exc)},
     )
-
-# Раздача скриншотов
-static_dir = "static" if os.path.exists("static") else "backend/static"
-app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
 app.include_router(scans.router, prefix="/api/v1", tags=["scans"])

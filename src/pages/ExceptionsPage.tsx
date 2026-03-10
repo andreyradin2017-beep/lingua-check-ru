@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { Title, Stack, Table, Text, Button, Group, ActionIcon, Paper, TextInput, Card, Badge, Loader, Center } from '@mantine/core';
 import { IconTrash, IconPlus, IconAlertCircle, IconCheck } from '@tabler/icons-react';
 import axios from 'axios';
@@ -44,9 +45,9 @@ export default function ExceptionsPage() {
       setExceptions([res.data, ...exceptions]);
       setNewWord('');
       notifications.show({ title: 'Добавлено', message: `Слово "${word}" добавлено в исключения`, color: 'green', icon: <IconCheck size={16} /> });
-    } catch (err: any) {
-      const msg = err.response?.data?.detail || 'Не удалось добавить исключение';
-      notifications.show({ title: 'Ошибка', message: msg, color: 'red' });
+    } catch (err: unknown) {
+      const msg = axios.isAxiosError(err) ? err.response?.data?.detail : 'Не удалось добавить исключение';
+      notifications.show({ title: 'Ошибка', message: msg || 'Не удалось добавить исключение', color: 'red' });
     } finally {
       setAddLoading(false);
     }
@@ -58,12 +59,17 @@ export default function ExceptionsPage() {
       setExceptions(exceptions.filter(e => e.id !== id));
       notifications.show({ title: 'Удалено', message: `Слово "${word}" удалено из исключений`, color: 'blue' });
     } catch (err) {
+      console.error("Failed to delete exception", err);
       notifications.show({ title: 'Ошибка', message: 'Не удалось удалить исключение', color: 'red' });
     }
   };
 
   return (
     <Stack gap="xl">
+      <Helmet>
+        <title>Глобальные исключения — LinguaCheck RU</title>
+        <meta name="description" content="Управление списком исключений и разрешенных заимствований для всей системы." />
+      </Helmet>
       <Stack gap={0}>
         <Title order={2}>Глобальные исключения</Title>
         <Text c="dimmed">Слова из этого списка никогда не будут помечаться как нарушения (англицизмы или ошибки).</Text>

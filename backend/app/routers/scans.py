@@ -58,8 +58,7 @@ async def create_scan(
         scan_id, 
         body.url, 
         body.max_depth, 
-        body.max_pages, 
-        body.capture_screenshots
+        body.max_pages
     )
 
     return ScanStartResponse(scan_id=scan_id, status="started")
@@ -107,6 +106,7 @@ async def get_scans() -> list[ScanHistoryItem]:
 @router.get("/scan/{scan_id}", response_model=ScanStatusResponse)
 async def get_scan(
     scan_id: str,
+    limit: int = 5000,  # Лимит нарушений (по умолчанию 5000 для больших сканов)
 ) -> ScanStatusResponse:
     """specs/api.md — GET /api/v1/scan/{scan_id}"""
     client = await get_async_supabase()
@@ -120,21 +120,20 @@ async def get_scan(
     pages_resp = await client.table("pages").select("*").eq("scan_id", scan_id).execute()
     pages = pages_resp.data
 
-    # Получаем нарушения (чанками по 100 страниц, чтобы избежать огромных запросов)
+    # Получаем нарушения с лимитом (чтобы не перегружать frontend)
     page_ids = [p["id"] for p in pages]
     violations = []
     if page_ids:
-        for i in range(0, len(page_ids), 100):
-            chunk = page_ids[i:i+100]
-            try:
-                v_resp = await client.table("violations").select("*").in_("page_id", chunk).execute()
-                violations.extend(v_resp.data)
-            except Exception as e:
-                logger.warning("Failed to fetch violations chunk: %s", e)
-    
+        # Берем только первые N нарушений для производительности
+        try:
+            v_resp = await client.table("violations").select("*").in_("page_id", page_ids).limit(limit).execute()
+            violations = v_resp.data
+        except Exception as e:
+            logger.warning("Failed to fetch violations: %s", e)
+
     pages_with_v = len({v["page_id"] for v in violations if v.get("page_id")})
 
-    # Группируем нарушения по страницам
+    # Группируем нарушения по страницам (для счетчика)
     v_by_page: dict[str, int] = {}
     for v in violations:
         pid = v.get("page_id")
@@ -172,11 +171,81 @@ async def get_scan(
         summary=ScanSummary(
             total_pages=len(pages),
             pages_with_violations=pages_with_v,
-            total_violations=len(violations),
+            total_violations=len(violations),  # Показываем сколько фактически вернули
         ),
         pages=page_schemas,
         violations=violation_schemas,
     )
+
+
+@router.get("/scan/{scan_id}/grouped", response_model=list)
+async def get_scan_grouped(
+    scan_id: str,
+    page_id: str = None,  # Если указан - группируем только для этой страницы
+) -> list:
+    """Группирует нарушения по слову + тип + страница (word xN)"""
+    client = await get_async_supabase()
+    
+    # Получаем страницы
+    if page_id:
+        pages_resp = await client.table("pages").select("id, url").eq("id", page_id).execute()
+    else:
+        pages_resp = await client.table("pages").select("id, url").eq("scan_id", scan_id).execute()
+    
+    pages = pages_resp.data
+    page_ids = [p["id"] for p in pages]
+    page_url_map = {p["id"]: p["url"] for p in pages}
+    
+    if not page_ids:
+        return []
+    
+    # Получаем все нарушения
+    violations = []
+    for i in range(0, len(page_ids), 100):
+        chunk = page_ids[i:i+100]
+        try:
+            v_resp = await client.table("violations").select("*").in_("page_id", chunk).execute()
+            violations.extend(v_resp.data)
+        except Exception as e:
+            logger.warning("Failed to fetch violations chunk: %s", e)
+    
+    # Группируем: (page_id, word, normal_form, type) -> count
+    from collections import defaultdict
+    groups = defaultdict(lambda: {"count": 0, "contexts": [], "id": None})
+    
+    for v in violations:
+        details = v.get("details", {})
+        word = details.get("word", "N/A")
+        normal_form = details.get("normal_form", "")
+        v_type = v.get("type", "unknown")
+        page_id_key = v.get("page_id", "unknown")
+        context = details.get("text_context", "")
+        
+        key = (page_id_key, word, normal_form, v_type)
+        groups[key]["count"] += 1
+        if len(groups[key]["contexts"]) < 3:  # Сохраняем до 3 контекстов
+            groups[key]["contexts"].append(context)
+        if not groups[key]["id"]:
+            groups[key]["id"] = v["id"]  # ID первого нарушения
+    
+    # Формируем результат
+    result = []
+    for (page_id_key, word, normal_form, v_type), data in groups.items():
+        result.append({
+            "id": data["id"],
+            "type": v_type,
+            "page_url": page_url_map.get(page_id_key, "Unknown"),
+            "word": word,
+            "normal_form": normal_form,
+            "count": data["count"],  # Количество повторений
+            "text_context": data["contexts"][0] if data["contexts"] else "",
+            "contexts": data["contexts"],  # Все сохраненные контексты
+        })
+    
+    # Сортируем по количеству (сначала самые частые)
+    result.sort(key=lambda x: -x["count"])
+    
+    return result
 
 
 @router.get("/scan/{scan_id}/violations", response_model=list[ViolationSchema])
@@ -255,19 +324,38 @@ async def delete_scan(scan_id: str):
 
 @router.delete("/scans")
 async def clear_scans() -> dict:
-    """Очищает всю историю сканирований."""
-    logger.info("Request to clear ALL scans history")
+    """Очищает всю историю сканирований чанками для предотвращения таймаутов."""
+    logger.info("Request to clear ALL scans history (chunked)")
     client = await get_async_supabase()
-    
+
     try:
-        # Удаляем всё по очереди
-        # На бесплатном тарифе Supabase REST не дает TRUNCATE, удаляем через фильтр
-        for table in ["violations", "tokens", "pages", "scans", "projects"]:
-            logger.info("Clearing table: %s", table)
-            await client.table(table).delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
-        
+        # Для каждой таблицы удаляем записи чанками
+        # Supabase REST API не поддерживает TRUNCATE, поэтому удаляем через фильтр по частям
+        target_tables = ["violations", "tokens", "pages", "scans", "projects"]
+
+        for table in target_tables:
+            logger.info("Clearing table: %s...", table)
+            deleted_count = 0
+            while True:
+                # На бесплатном тарифе удаляем по 1000 записей
+                # Используем is.not.eq() для удаления всех записей
+                resp = await client.table(table).delete().neq("id", "00000000-0000-0000-0000-000000000000").limit(1000).execute()
+
+                # Если данных больше нет (пустой список) — переходим к следующей таблице
+                # resp.data содержит удаленные записи, если их не было - будет []
+                if resp.data is None or len(resp.data) == 0:
+                    break
+
+                deleted_count += len(resp.data)
+                logger.debug("Deleted %d records from %s", deleted_count, table)
+
+                # Короткая пауза для стабильности Event Loop и БД
+                await asyncio.sleep(0.1)
+
+            logger.info("Table %s cleared. Total records removed: %d", table, deleted_count)
+
         logger.info("All scans history cleared successfully")
-        return {"status": "cleared"}
+        return {"status": "cleared", "message": "History cleared via chunked deletion"}
     except Exception as e:
         logger.error("Error during history clearing: %s", str(e))
         raise HTTPException(status_code=500, detail=str(e))

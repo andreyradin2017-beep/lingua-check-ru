@@ -7,15 +7,16 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+# Node modules
+node_modules/
+dist/
+dist-ssr/
 *.local
 
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
 *.suo
 *.ntvs*
@@ -23,15 +24,47 @@ dist-ssr
 *.sln
 *.sw?
 
-# Python virtual environment
-.venv
-venv
-ENV
-backend/.venv
+# Python virtual environment and cache
+.venv/
+venv/
+ENV/
+backend/.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+backend/.pytest_cache/
+backend/__pycache__/
 
-# Project specific temp files
+# Project specific temp files and reports
 backend/history_all.json
 e2e_test.log
 test_results/
 reports/
 backend/static/screenshots/
+*.xlsx
+*.csv
+pytest_detailed.txt
+test_output*.txt
+test_result*.txt
+backend/test_output*.txt
+backend/test_results.txt
+backend/test_token_output.txt
+backend/scan_debug.log
+all_e2e_tests.txt
+backend/backend_all_tests.txt
+single_test.txt
+
+# Ensure config files and important docs are kept
+!package.json
+!package-lock.json
+!tsconfig*.json
+!backend/requirements.txt
+!alembic.ini
+!backend/alembic.ini
+!*.md
+!pytest.ini
+!backend/pytest.ini
+!LICENSE*

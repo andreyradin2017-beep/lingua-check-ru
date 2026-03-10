@@ -44,8 +44,7 @@ class PageSchema(BaseModel):
 class ScanStartRequest(BaseModel):
     url: str
     max_depth: int = Field(default=3, ge=1, le=5)  # specs/security.md
-    max_pages: int = Field(default=100, ge=1, le=500)  # specs/security.md
-    capture_screenshots: bool = True
+    max_pages: int = Field(default=100, ge=1, le=1000)  # specs/security.md
 
     @field_validator("url")
     @classmethod

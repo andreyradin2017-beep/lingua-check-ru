@@ -1,6 +1,6 @@
 # API Specification: LinguaCheck-RU
 
-**Версия:** 1.6.0  
+**Версия:** 1.7.0  
 **Base URL:** `http://127.0.0.1:8000`  
 **Документация Swagger:** `http://127.0.0.1:8000/docs`
 
@@ -13,15 +13,16 @@
 Запуск сканирования сайта.
 
 **Request:**
+
 ```json
 {
   "url": "https://example.com",
-  "max_depth": 3,
-  "capture_screenshots": false
+  "max_depth": 3
 }
 ```
 
 **Response (200 OK):**
+
 ```json
 {
   "scan_id": "4ee8a825-39b4-49cd-9271-4bb0a5311208",
@@ -43,6 +44,7 @@
 Получение статуса и результатов сканирования.
 
 **Response (200 OK):**
+
 ```json
 {
   "status": "completed",
@@ -66,8 +68,7 @@
       "page_url": "https://example.com/about",
       "text_context": "Welcome to our company",
       "word": "Welcome",
-      "normal_form": "welcome",
-      "screenshot_path": "/static/screenshots/uuid.png"
+      "normal_form": "welcome"
     }
   ]
 }
@@ -89,6 +90,7 @@
 Остановка активного сканирования.
 
 **Response (200 OK):**
+
 ```json
 {
   "message": "Сигнал остановки отправлен"
@@ -102,6 +104,7 @@
 Получение истории всех сканирований.
 
 **Response (200 OK):**
+
 ```json
 [
   {
@@ -138,6 +141,7 @@
 Проверка произвольного текста.
 
 **Request:**
+
 ```json
 {
   "text": "Я купил новую батарею для своего устройства",
@@ -146,6 +150,7 @@
 ```
 
 **Response (200 OK):**
+
 ```json
 {
   "summary": {
@@ -164,11 +169,13 @@
 Загрузка файла для проверки (TXT, DOCX, PDF).
 
 **Request (multipart/form-data):**
+
 ```
 file: test_document.txt
 ```
 
 **Response (200 OK):**
+
 ```json
 {
   "summary": {
@@ -196,6 +203,7 @@ file: test_document.txt
 Получение списка всех зарегистрированных брендов.
 
 **Response (200 OK):**
+
 ```json
 [
   {
@@ -213,6 +221,7 @@ file: test_document.txt
 Добавление нового бренда. Слово автоматически нормализуется.
 
 **Request:**
+
 ```json
 {
   "word": "CoffeeMaster"
@@ -220,6 +229,7 @@ file: test_document.txt
 ```
 
 **Response (201 Created):**
+
 ```json
 {
   "id": "trademark-uuid",
@@ -251,6 +261,7 @@ file: test_document.txt
 Получение списка всех глобальных исключений.
 
 **Response (200 OK):**
+
 ```json
 [
   {
@@ -268,6 +279,7 @@ file: test_document.txt
 Добавление нового глобального исключения.
 
 **Request:**
+
 ```json
 {
   "word": "gmp"
@@ -275,6 +287,7 @@ file: test_document.txt
 ```
 
 **Response (201 Created):**
+
 ```json
 {
   "id": "exception-uuid",
@@ -300,6 +313,7 @@ file: test_document.txt
 Предварительный просмотр словарей.
 
 **Response (200 OK):**
+
 ```json
 {
   "dictionary_versions": [
@@ -326,6 +340,7 @@ file: test_document.txt
 Проверка работоспособности API.
 
 **Response (200 OK):**
+
 ```json
 {
   "status": "healthy"
@@ -338,17 +353,17 @@ file: test_document.txt
 
 ### Violation
 
-| Поле | Тип | Описание |
-|------|-----|----------|
-| `id` | string (UUID) | Уникальный идентификатор |
-| `type` | string | Тип нарушения |
-| `page_url` | string \| null | URL страницы |
-| `text_context` | string | Контекст нарушения |
-| `word` | string \| null | Проблемное слово |
-| `normal_form` | string \| null | Лемма слова |
-| `screenshot_path` | string \| null | Путь к скриншоту |
+| Поле           | Тип            | Описание                 |
+| -------------- | -------------- | ------------------------ |
+| `id`           | string (UUID)  | Уникальный идентификатор |
+| `type`         | string         | Тип нарушения            |
+| `page_url`     | string \| null | URL страницы             |
+| `text_context` | string         | Контекст нарушения       |
+| `word`         | string \| null | Проблемное слово         |
+| `normal_form`  | string \| null | Лемма слова              |
 
 **Типы нарушений:**
+
 - `foreign_word` — Иностранная лексика
 - `no_russian_dub` — Отсутствие перевода
 - `unrecognized_word` — Опечатка / Не распознано
@@ -357,49 +372,50 @@ file: test_document.txt
 
 ### Page
 
-| Поле | Тип | Описание |
-|------|-----|----------|
-| `id` | string (UUID) | Уникальный идентификатор |
-| `url` | string | URL страницы |
-| `violations_count` | int | Количество нарушений |
+| Поле               | Тип           | Описание                 |
+| ------------------ | ------------- | ------------------------ |
+| `id`               | string (UUID) | Уникальный идентификатор |
+| `url`              | string        | URL страницы             |
+| `violations_count` | int           | Количество нарушений     |
 
 ### ScanResult
 
-| Поле | Тип | Описание |
-|------|-----|----------|
-| `status` | string | Статус сканирования |
-| `target_url` | string | Целевой URL |
-| `summary` | object | Сводная статистика |
-| `pages` | Page[] | Список страниц |
-| `violations` | Violation[] | Список нарушений |
+| Поле         | Тип         | Описание            |
+| ------------ | ----------- | ------------------- |
+| `status`     | string      | Статус сканирования |
+| `target_url` | string      | Целевой URL         |
+| `summary`    | object      | Сводная статистика  |
+| `pages`      | Page[]      | Список страниц      |
+| `violations` | Violation[] | Список нарушений    |
 
 ### Trademark
 
-| Поле | Тип | Описание |
-|------|-----|----------|
-| `id` | string (UUID) | Уникальный идентификатор |
-| `word` | string | Оригинальное слово |
-| `normal_form` | string | Нормализованная форма |
+| Поле          | Тип           | Описание                 |
+| ------------- | ------------- | ------------------------ |
+| `id`          | string (UUID) | Уникальный идентификатор |
+| `word`        | string        | Оригинальное слово       |
+| `normal_form` | string        | Нормализованная форма    |
 
 ### GlobalException
 
-| Поле | Тип | Описание |
-|------|-----|----------|
-| `id` | string (UUID) | Уникальный идентификатор |
-| `word` | string | Слово-исключение |
-| `created_at` | string (ISO 8601) | Дата добавления |
+| Поле         | Тип               | Описание                 |
+| ------------ | ----------------- | ------------------------ |
+| `id`         | string (UUID)     | Уникальный идентификатор |
+| `word`       | string            | Слово-исключение         |
+| `created_at` | string (ISO 8601) | Дата добавления          |
 
 ---
 
 ## 8. Rate Limiting
 
-| Endpoint | Лимит |
-|----------|-------|
-| `/api/v1/scan` | 10 запросов/минуту |
+| Endpoint             | Лимит              |
+| -------------------- | ------------------ |
+| `/api/v1/scan`       | 10 запросов/минуту |
 | `/api/v1/check_text` | 20 запросов/минуту |
-| Остальные | 30 запросов/минуту |
+| Остальные            | 30 запросов/минуту |
 
 **Ответ при превышении лимита (429 Too Many Requests):**
+
 ```json
 {
   "detail": "Rate limit exceeded. Try again later."
@@ -411,6 +427,7 @@ file: test_document.txt
 ## 9. CORS
 
 **Разрешенные origin:**
+
 - `http://localhost:5173` (development)
 - Настраивается через `CORS_ORIGINS` в `.env`
 
@@ -420,4 +437,4 @@ file: test_document.txt
 
 ---
 
-*Документ синхронизирован с кодом 9 марта 2026*
+_Документ синхронизирован с кодом 9 марта 2026_

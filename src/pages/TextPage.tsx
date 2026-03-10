@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { Title, Stack, Group, Button, Textarea, Paper, Badge, Text, Tabs, FileButton, List, ThemeIcon, Pagination } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { IconFileText, IconTypography, IconAlertCircle, IconCheck, IconFileCheck, IconFileSpreadsheet, IconFileTypePdf } from '@tabler/icons-react';
@@ -115,6 +116,10 @@ export default function TextPage() {
 
   return (
     <Stack gap="xl">
+      <Helmet>
+        <title>Проверка текста и файлов — LinguaCheck RU</title>
+        <meta name="description" content="Анализ текстов, документов DOCX и PDF на соблюдение норм государственного языка." />
+      </Helmet>
       <Stack gap={0}>
         <Title order={2}>Проверка текста и файлов</Title>
         <Text c="dimmed">Мгновенный анализ и экспорт отчетов на соответствие нормам</Text>

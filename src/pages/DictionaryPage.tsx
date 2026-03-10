@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { Title, Card, Stack, Group, SimpleGrid, Badge, Text, Loader, Center } from '@mantine/core';
 import { IconBooks, IconDatabase, IconAlertCircle } from '@tabler/icons-react';
 import axios from 'axios';
@@ -50,6 +51,10 @@ export default function DictionaryPage() {
 
   return (
     <Stack gap="lg">
+      <Helmet>
+        <title>Нормативные словари — LinguaCheck RU</title>
+        <meta name="description" content="Список словарей, используемых системой для верификации чистоты русского языка." />
+      </Helmet>
       <Group justify="space-between">
         <Stack gap={0}>
           <Title order={2}>Нормативные словари</Title>

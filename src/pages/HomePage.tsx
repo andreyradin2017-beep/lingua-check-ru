@@ -1,6 +1,7 @@
 import { Title, Text, Button, Paper, Group, SimpleGrid, ThemeIcon, Stack } from '@mantine/core';
 import { IconShieldCheck, IconFileSearch, IconScale } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -27,7 +28,12 @@ export default function HomePage() {
   ];
 
   return (
-    <Stack gap="xl">
+    <>
+      <Helmet>
+        <title>LinguaCheck RU — Мониторинг чистоты государственного языка</title>
+        <meta name="description" content="Автоматизированная проверка сайтов и документов на соответствие ФЗ №168-ФЗ о государственном языке РФ." />
+      </Helmet>
+      <Stack gap="xl">
       {/* FIX #5: Адаптивный padding для мобильных */}
       <Paper p={{ base: 24, sm: 50 }} radius="lg" withBorder bg="white">
         <Stack align="center" gap="md">
@@ -56,5 +62,6 @@ export default function HomePage() {
         ))}
       </SimpleGrid>
     </Stack>
+    </>
   );
 }

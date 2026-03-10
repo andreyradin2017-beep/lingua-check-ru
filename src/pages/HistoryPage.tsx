@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { Title, Stack, Table, Badge, Paper, Text, Button, Group, ActionIcon, Modal, Loader, Center, Tooltip, Pagination } from '@mantine/core';
 import { IconArrowRight, IconTrash, IconAlertTriangle, IconHistory, IconX } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
@@ -115,22 +116,36 @@ export default function HistoryPage() {
 
   return (
     <Stack gap="xl">
+      <Helmet>
+        <title>История сканирований — LinguaCheck RU</title>
+        <meta name="description" content="Просмотр результатов предыдущих проверок и управление историей сканирований." />
+      </Helmet>
       <Group justify="space-between" align="flex-end">
         <Stack gap={0}>
           <Title order={2}>История проверок</Title>
           <Text c="dimmed">Список ранее запущенных сканирований</Text>
         </Stack>
-        {scans.length > 0 && (
+        <Group>
           <Button 
-            variant="subtle" 
-            color="red" 
-            leftSection={<IconTrash size={16} />}
-            onClick={openClearConfirm}
+            variant="light" 
+            leftSection={<IconHistory size={16}/>} 
+            onClick={() => fetchHistory()}
             loading={loading}
           >
-            Очистить историю
+            Обновить
           </Button>
-        )}
+          {scans.length > 0 && (
+            <Button 
+              variant="subtle" 
+              color="red" 
+              leftSection={<IconTrash size={16} />}
+              onClick={openClearConfirm}
+              loading={loading}
+            >
+              Очистить историю
+            </Button>
+          )}
+        </Group>
       </Group>
 
       <Paper withBorder radius="md">

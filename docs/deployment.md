@@ -1,6 +1,6 @@
 # Deployment Guide: LinguaCheck-RU
 
-**Версия:** 1.6.0  
+**Версия:** 1.7.0  
 **Дата обновления:** 9 марта 2026
 
 ---
@@ -13,18 +13,18 @@ flowchart TB
         A[React App] --> B[Vite Dev Server]
         A --> C[Production Build]
     end
-    
+
     subgraph Backend
         D[FastAPI] --> E[Uvicorn]
         E --> F[Playwright]
         E --> G[Pymorphy3]
     end
-    
+
     subgraph Database
         H[(PostgreSQL)]
         H --> I[Supabase Cloud]
     end
-    
+
     B --> E
     C --> E
     E --> H
@@ -36,21 +36,21 @@ flowchart TB
 
 ### 2.1. Минимальные
 
-| Компонент | Требование |
-|-----------|------------|
-| CPU | 2 ядра |
-| RAM | 4 GB |
-| Disk | 10 GB |
-| OS | Linux/macOS/Windows |
+| Компонент | Требование          |
+| --------- | ------------------- |
+| CPU       | 2 ядра              |
+| RAM       | 4 GB                |
+| Disk      | 10 GB               |
+| OS        | Linux/macOS/Windows |
 
 ### 2.2. Рекомендуемые
 
-| Компонент | Требование |
-|-----------|------------|
-| CPU | 4 ядра |
-| RAM | 8 GB |
-| Disk | 20 GB SSD |
-| OS | Linux (Ubuntu 22.04+) |
+| Компонент | Требование            |
+| --------- | --------------------- |
+| CPU       | 4 ядра                |
+| RAM       | 8 GB                  |
+| Disk      | 20 GB SSD             |
+| OS        | Linux (Ubuntu 22.04+) |
 
 ---
 
@@ -59,6 +59,7 @@ flowchart TB
 ### 3.1. Предварительные требования
 
 **Node.js:**
+
 ```bash
 # Проверка версии
 node --version  # Требуется: 18+
@@ -68,6 +69,7 @@ winget install OpenJS.NodeJS.LTS
 ```
 
 **Python:**
+
 ```bash
 # Проверка версии
 python --version  # Требуется: 3.12+
@@ -77,6 +79,7 @@ winget install Python.Python.3.12
 ```
 
 **Playwright:**
+
 ```bash
 pip install playwright
 playwright install chromium
@@ -110,6 +113,7 @@ npm run dev
 ```
 
 **Проверка:**
+
 - Открыть http://localhost:5173
 - Должна отобразиться главная страница
 
@@ -138,17 +142,22 @@ cp .env.example .env  # Linux/macOS
 # SUPABASE_KEY=your-service-role-key
 ```
 
-**Миграции БД:**
+**Миграции и настройка БД:**
+
 ```bash
-alembic upgrade head
+python manage.py init
+python manage.py seed
+python manage.py update-counts
 ```
 
 **Запуск:**
+
 ```bash
 python run.py
 ```
 
 **Проверка:**
+
 - Открыть http://127.0.0.1:8000/docs
 - Должен отобразиться Swagger UI
 
@@ -159,8 +168,9 @@ python run.py
 ### 4.1. Docker Compose
 
 **docker-compose.yml:**
+
 ```yaml
-version: '3.8'
+version: "3.8"
 
 services:
   frontend:
@@ -201,11 +211,13 @@ volumes:
 ```
 
 **Запуск:**
+
 ```bash
 docker-compose up -d
 ```
 
 **Проверка:**
+
 ```bash
 docker-compose ps
 docker-compose logs -f
@@ -216,6 +228,7 @@ docker-compose logs -f
 ### 4.2. Frontend Dockerfile
 
 **Dockerfile.frontend:**
+
 ```dockerfile
 FROM node:20-alpine AS builder
 
@@ -235,6 +248,7 @@ CMD ["nginx", "-g", "daemon off;"]
 ```
 
 **nginx.conf:**
+
 ```nginx
 server {
     listen 80;
@@ -259,6 +273,7 @@ server {
 ### 4.3. Backend Dockerfile
 
 **backend/Dockerfile:**
+
 ```dockerfile
 FROM python:3.12-slim
 
@@ -304,23 +319,24 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 ### Frontend (.env)
 
-| Переменная | Описание | Default |
-|------------|----------|---------|
+| Переменная     | Описание        | Default                 |
+| -------------- | --------------- | ----------------------- |
 | `VITE_API_URL` | URL backend API | `http://127.0.0.1:8000` |
 
 ### Backend (.env)
 
-| Переменная | Описание | Required |
-|------------|----------|----------|
-| `DATABASE_URL` | PostgreSQL connection string | ✅ |
-| `SUPABASE_URL` | Supabase project URL | ✅ |
-| `SUPABASE_KEY` | Supabase service role key | ✅ |
-| `CORS_ORIGINS` | Comma-separated allowed origins | `http://localhost:5173` |
-| `MAX_DEPTH_LIMIT` | Макс. глубина сканирования | `5` |
-| `MAX_PAGES_LIMIT` | Макс. страниц | `500` |
-| `MAX_FILE_SIZE_MB` | Макс. размер файла | `10` |
+| Переменная         | Описание                        | Required                |
+| ------------------ | ------------------------------- | ----------------------- |
+| `DATABASE_URL`     | PostgreSQL connection string    | ✅                      |
+| `SUPABASE_URL`     | Supabase project URL            | ✅                      |
+| `SUPABASE_KEY`     | Supabase service role key       | ✅                      |
+| `CORS_ORIGINS`     | Comma-separated allowed origins | `http://localhost:5173` |
+| `MAX_DEPTH_LIMIT`  | Макс. глубина сканирования      | `5`                     |
+| `MAX_PAGES_LIMIT`  | Макс. страниц                   | `500`                   |
+| `MAX_FILE_SIZE_MB` | Макс. размер файла              | `10`                    |
 
 **Пример .env:**
+
 ```env
 DATABASE_URL=postgresql+asyncpg://user:password@host:5432/dbname
 SUPABASE_URL=https://abcdefgh.supabase.co
@@ -370,22 +386,24 @@ curl http://localhost:8000/api/v1/health
 ### 7.2. Логи
 
 **Frontend:**
+
 ```bash
 docker-compose logs frontend
 ```
 
 **Backend:**
+
 ```bash
 docker-compose logs backend
 ```
 
 ### 7.3. Метрики
 
-| Метрика | Endpoint | Описание |
-|---------|----------|----------|
-| Health | `/api/v1/health` | Статус сервиса |
-| Scans | `/api/v1/scans` | История сканирований |
-| Dictionary | `/api/v1/dictionary_preview` | Статус словарей |
+| Метрика    | Endpoint                     | Описание             |
+| ---------- | ---------------------------- | -------------------- |
+| Health     | `/api/v1/health`             | Статус сервиса       |
+| Scans      | `/api/v1/scans`              | История сканирований |
+| Dictionary | `/api/v1/dictionary_preview` | Статус словарей      |
 
 ---
 
@@ -396,6 +414,7 @@ docker-compose logs backend
 **Проблема:** `Error: listen EADDRINUSE: address already in use :::5173`
 
 **Решение:**
+
 ```bash
 # Найти процесс на порту 5173
 netstat -ano | findstr :5173
@@ -414,6 +433,7 @@ npm run dev -- --port 5174
 **Проблема:** `could not connect to server`
 
 **Решение:**
+
 1. Проверить DATABASE_URL в .env
 2. Проверить доступность PostgreSQL
 3. Проверить firewall правила
@@ -430,6 +450,7 @@ psql "postgresql://user:pass@host:5432/dbname"
 **Проблема:** `Executable doesn't exist at /path/to/chromium`
 
 **Решение:**
+
 ```bash
 playwright install chromium
 playwright install-deps chromium
@@ -440,6 +461,7 @@ playwright install-deps chromium
 ## 9. CI/CD (GitHub Actions)
 
 **.github/workflows/ci.yml:**
+
 ```yaml
 name: CI
 
@@ -452,7 +474,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     services:
       postgres:
         image: postgres:15
@@ -465,25 +487,25 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
-    
+
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '20'
-      
+          node-version: "20"
+
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.12'
-      
+          python-version: "3.12"
+
       - name: Install dependencies
         run: |
           npm ci
           cd backend && pip install -r requirements.txt
-      
+
       - name: Run tests
         run: |
           npm run lint
@@ -492,4 +514,4 @@ jobs:
 
 ---
 
-*Документ синхронизирован с кодом 9 марта 2026*
+_Документ синхронизирован с кодом 9 марта 2026_

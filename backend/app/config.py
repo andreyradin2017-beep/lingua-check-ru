@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     )
     # Лимиты сканирования (specs/security.md)
     max_depth_limit: int = 5
-    max_pages_limit: int = 500
+    max_pages_limit: int = 1000
     max_file_size_mb: int = 10
 
     supabase_url: str = ""

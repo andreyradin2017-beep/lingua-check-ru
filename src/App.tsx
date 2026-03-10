@@ -1,7 +1,8 @@
-import { AppShell, Burger, Group, NavLink, Title, Text, Container } from '@mantine/core';
+import { AppShell, Burger, Group, NavLink, Title, Text, Container, Stack } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { IconGlobe, IconFileText, IconBooks, IconHome, IconSearch, IconHistory, IconX } from '@tabler/icons-react';
+import { HelmetProvider } from 'react-helmet-async';
 
 // Импортируем страницы (создадим их следом)
 import HomePage from './pages/HomePage';
@@ -14,6 +15,7 @@ import NotFoundPage from './pages/NotFoundPage';
 
 export default function App() {
   const [opened, { toggle }] = useDisclosure();
+  const [desktopOpened, { toggle: toggleDesktop }] = useDisclosure(true);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -27,43 +29,49 @@ export default function App() {
   ];
 
   return (
-    <AppShell
-      header={{ height: 60 }}
-      navbar={{
-        width: 300,
-        breakpoint: 'sm',
-        collapsed: { mobile: !opened },
-      }}
-      padding="md"
-    >
+    <HelmetProvider>
+      <AppShell
+        header={{ height: 60 }}
+        navbar={{
+          width: desktopOpened ? 300 : 80,
+          breakpoint: 'sm',
+          collapsed: { mobile: !opened },
+        }}
+        padding="md"
+      >
       <AppShell.Header>
-        <Group h="100%" px="md">
-          <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
-          <IconSearch color="var(--mantine-color-blue-6)" size={28} />
-          <Title order={3} className="gradient-text">LinguaCheck RU</Title>
-          <Text size="xs" c="dimmed" ml="auto">ФЗ №168‑ФЗ</Text>
+        <Group h="100%" px="md" justify="space-between">
+          <Group>
+            <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
+            <Burger opened={desktopOpened} onClick={toggleDesktop} visibleFrom="sm" size="sm" />
+            <IconSearch color="var(--mantine-color-blue-6)" size={28} />
+            <Title order={3} className="gradient-text">LinguaCheck RU</Title>
+          </Group>
+          <Text size="xs" c="dimmed" visibleFrom="xs">ФЗ №168‑ФЗ: Государственный язык РФ</Text>
         </Group>
       </AppShell.Header>
 
       <AppShell.Navbar p="md">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.path}
-            // FIX #3: Добавлен aria-label для навигации
-            aria-label={`Перейти на страницу ${item.label}`}
-            label={item.label}
-            leftSection={item.icon}
-            active={location.pathname === item.path}
-            onClick={() => {
-              navigate(item.path);
-              if (opened) toggle();
-            }}
-            variant="light"
-            styles={{
-              label: { fontSize: '1rem', fontWeight: 500 }
-            }}
-          />
-        ))}
+        <Stack gap="xs">
+          {navItems.map((item) => (
+            <NavLink
+              key={item.path}
+              aria-label={`Перейти на страницу ${item.label}`}
+              label={desktopOpened ? item.label : null}
+              leftSection={item.icon}
+              active={location.pathname === item.path}
+              onClick={() => {
+                navigate(item.path);
+                if (opened) toggle();
+              }}
+              variant="light"
+              styles={{
+                label: { fontSize: '1rem', fontWeight: 500 },
+                root: { borderRadius: 'var(--mantine-radius-md)' }
+              }}
+            />
+          ))}
+        </Stack>
       </AppShell.Navbar>
 
       <AppShell.Main bg="gray.0">
@@ -79,6 +87,7 @@ export default function App() {
           </Routes>
         </Container>
       </AppShell.Main>
-    </AppShell>
+      </AppShell>
+    </HelmetProvider>
   );
 }

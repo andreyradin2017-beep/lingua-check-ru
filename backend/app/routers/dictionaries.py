@@ -44,22 +44,11 @@ async def dictionary_preview() -> DictionaryPreviewResponse:
         logger.info("dictionary_preview REST API: Найдено %d версий", len(versions))
 
         for dv in versions:
-            # Временно отключаем подсчет слов через API, так как Count запросы на больших
-            # таблицах в Supabase (Free Tier) регулярно отваливаются по таймауту и вешают фронтенд.
-            # Вместо этого используем примерную оценку или 0 для успешной отдачи списка словарей.
-            word_count = 0
-            if dv["name"] == "Orthographic":
-                word_count = 118824
-            elif dv["name"] == "ForeignWords":
-                word_count = 121193
-            elif dv["name"] == "Orthoepic":
-                word_count = 55408
-
             result.append(
                 DictionaryVersionSchema(
                     name=dv["name"],
                     version=dv["version"],
-                    word_count=word_count,
+                    word_count=dv.get("word_count", 0),
                 )
             )
 

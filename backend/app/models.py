@@ -62,6 +62,7 @@ class DictionaryVersion(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     version: Mapped[str] = mapped_column(String(10), nullable=False)
     pdf_path: Mapped[str] = mapped_column(Text, nullable=False)
+    word_count: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     processed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
