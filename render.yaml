@@ -2,11 +2,10 @@ services:
   - type: web
     name: linguacheck-backend
     runtime: docker
-    env: python
     region: frankfurt # Ближе к РФ
     plan: free
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
+    dockerfilePath: Dockerfile
+    dockerContext: .
     envVars:
       - key: DATABASE_URL
         sync: false
