@@ -8,6 +8,7 @@ import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { Helmet } from 'react-helmet-async';
+import { API_URL } from '@/config/api';
 
 
 interface Violation {
@@ -84,7 +85,7 @@ export default function ScanPage() {
 
   const fetchTrademarks = async () => {
     try {
-      const res = await axios.get('http://127.0.0.1:8000/api/v1/trademarks');
+      const res = await axios.get(`${API_URL}/api/v1/trademarks`);
       setTrademarks(res.data);
     } catch (err: unknown) {
       console.error('Failed to fetch trademarks', err);
@@ -94,7 +95,7 @@ export default function ScanPage() {
   const addTrademark = async (word: string) => {
     if (!word) return;
     try {
-      await axios.post('http://127.0.0.1:8000/api/v1/trademarks', { word });
+      await axios.post(`${API_URL}/api/v1/trademarks`, { word });
       notifications.show({ title: 'Бренд добавлен', message: `Слово "${word}" теперь исключено из нарушений`, color: 'green' });
       await fetchTrademarks();
     } catch (err: unknown) {
@@ -107,7 +108,7 @@ export default function ScanPage() {
   const addException = async (word: string) => {
     if (!word) return;
     try {
-      await axios.post('http://127.0.0.1:8000/api/v1/exceptions', { word });
+      await axios.post(`${API_URL}/api/v1/exceptions`, { word });
       notifications.show({ title: 'Добавлено в исключения', message: `Слово "${word}" добавлено в глобальные исключения`, color: 'green' });
     } catch (err: unknown) {
       const msg = axios.isAxiosError(err) ? err.response?.data?.detail || err.message : String(err);
@@ -126,7 +127,7 @@ export default function ScanPage() {
     setResult(null);
     setPage(1);
     try {
-      const res = await axios.post('http://127.0.0.1:8000/api/v1/scan', {
+      const res = await axios.post(`${API_URL}/api/v1/scan`, {
         url: targetUrl,
         max_depth: Number(depth),
       });
@@ -144,13 +145,13 @@ export default function ScanPage() {
 
   const checkStatus = async (id: string) => {
     try {
-      const res = await axios.get(`http://127.0.0.1:8000/api/v1/scan/${id}`);
+      const res = await axios.get(`${API_URL}/api/v1/scan/${id}`);
       setResult(res.data);
 
       // Загружаем сгруппированные нарушения если есть данные
       if (res.data.summary && res.data.summary.total_violations > 0) {
         try {
-          const groupedRes = await axios.get(`http://127.0.0.1:8000/api/v1/scan/${id}/grouped`);
+          const groupedRes = await axios.get(`${API_URL}/api/v1/scan/${id}/grouped`);
           setGroupedViolations(groupedRes.data);
         } catch (err) {
           console.error('Failed to load grouped violations', err);
