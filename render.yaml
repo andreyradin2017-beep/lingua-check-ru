@@ -4,7 +4,7 @@ services:
     runtime: docker
     region: frankfurt # Ближе к РФ
     plan: free
-    dockerfilePath: backend/Dockerfile
+    dockerfilePath: Dockerfile
     dockerContext: backend
     envVars:
       - key: DATABASE_URL
