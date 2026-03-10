@@ -8,7 +8,7 @@ import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { Helmet } from 'react-helmet-async';
-import { API_URL } from '@/config/api';
+import { API_URL } from '../config/api';
 
 
 interface Violation {
