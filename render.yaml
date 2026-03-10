@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: linguacheck-backend
+    runtime: docker
+    env: python
+    region: frankfurt # Ближе к РФ
+    plan: free
+    dockerFilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        value: '["*"]'
+      - key: MAX_DEPTH_LIMIT
+        value: "3"
+      - key: MAX_PAGES_LIMIT
+        value: "100"
