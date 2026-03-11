@@ -10,7 +10,7 @@ Request (JSON):
 
 - `url`: string, required
 - `max_depth`: int, default 3
-- `max_pages`: int, default 100
+- `max_pages`: int, default 500, max 1000
 
 Response (JSON):
 
@@ -107,7 +107,7 @@ Response:
 - `text_context`: string
 - `word`: string | null
 - `normal_form`: string | null
-- `details`: object (произвольные поля: screenshot_path, language, etc.)
+- `details`: object (произвольные поля: word, normal_form, text_context, etc.)
 
 ---
 

@@ -1,8 +1,8 @@
 # Data Model Specification: LinguaCheck-RU
 
-**Версия:** 1.6.0  
+**Версия:** 1.7.0  
 **СУБД:** PostgreSQL 15+ (Supabase)  
-**Дата обновления:** 9 марта 2026
+**Дата обновления:** 11 марта 2026
 
 ---
 
@@ -36,8 +36,7 @@ erDiagram
 | `started_at` | TIMESTAMPTZ | ❌ | Время начала |
 | `finished_at` | TIMESTAMPTZ | ✅ | Время завершения |
 | `max_depth` | INTEGER | ❌ | Макс. глубина обхода (1-5) |
-| `max_pages` | INTEGER | ❌ | Макс. страниц (до 500) |
-| `capture_screenshots` | BOOLEAN | ❌ | Делать скриншоты |
+| `max_pages` | INTEGER | ❌ | Макс. страниц (до 1000) |
 
 **Индексы:**
 ```sql
@@ -271,9 +270,7 @@ erDiagram
         text status
         timestamptz started_at
         timestamptz finished_at
-        integer max_depth
         integer max_pages
-        boolean capture_screenshots
     }
     
     pages ||--o{ tokens : contains
@@ -337,4 +334,4 @@ erDiagram
 
 ---
 
-*Документ синхронизирован с кодом 9 марта 2026*
+*Документ синхронизирован с кодом 11 марта 2026*

@@ -6,7 +6,7 @@
   - должен начинаться с `http://` или `https://`.
   - запрещать `javascript:` и `data:` схемы.
 - Ограничения:
-  - `max_depth` и `max_pages` ограничить (например, max_depth ≤ 5, max_pages ≤ 500).
+  - `max_depth` и `max_pages` ограничить (например, max_depth ≤ 5, max_pages ≤ 1000).
 - Файлы:
   - разрешённые форматы: TXT, DOCX, PDF.
   - максимальный размер файла: 10 МБ.

@@ -1,7 +1,7 @@
 # Security & Validation Specification
 
-**Версия:** 1.6.0  
-**Дата обновления:** 9 марта 2026
+**Версия:** 1.7.0  
+**Дата обновления:** 11 марта 2026
 
 ---
 
@@ -64,7 +64,7 @@ class ScanRequest(BaseModel):
 | Параметр | Тип | Мин | Макс | Default |
 |----------|-----|-----|------|---------|
 | `max_depth` | int | 1 | 5 | 3 |
-| `max_pages` | int | 1 | 500 | 100 |
+| `max_pages` | int | 1 | 1000 | 500 |
 
 **Backend:**
 ```python
@@ -72,7 +72,7 @@ from pydantic import Field
 
 class ScanRequest(BaseModel):
     max_depth: int = Field(default=3, ge=1, le=5)
-    max_pages: int = Field(default=100, ge=1, le=500)
+    max_pages: int = Field(default=500, ge=1, le=1000)
 ```
 
 ---
@@ -232,7 +232,7 @@ def is_private_ip(hostname: str) -> bool:
 | Параметр | Значение | Обоснование |
 |----------|----------|-------------|
 | `max_depth` | 5 | Достаточно для большинства сайтов |
-| `max_pages` | 500 | Защита от бесконечного сканирования |
+| `max_pages` | 1000 | Защита от бесконечного сканирования |
 | `timeout_per_page` | 120с | Защита от зависаний |
 
 ---
@@ -330,4 +330,4 @@ API_KEYS=key1,key2,key3
 
 ---
 
-*Документ синхронизирован с кодом 9 марта 2026*
+*Документ синхронизирован с кодом 11 марта 2026*
