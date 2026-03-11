@@ -34,6 +34,7 @@ interface ScanResult {
     total_pages: number;
     pages_with_violations: number;
     total_violations: number;
+    pending_pages?: number;
   };
   pages: Page[];
   violations: Violation[];
@@ -58,7 +59,8 @@ interface Trademark {
 
 export default function ScanPage() {
   const [url, setUrl] = useState('');
-  const [depth, setDepth] = useState<number | string>(2);
+  const [depth, setDepth] = useState<number | string>(3);
+  const [maxPages, setMaxPages] = useState<number | string>(500);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
   
@@ -130,6 +132,7 @@ export default function ScanPage() {
       const res = await axios.post(`${API_URL}/api/v1/scan`, {
         url: targetUrl,
         max_depth: Number(depth),
+        max_pages: Number(maxPages),
       });
       notifications.show({ title: 'Сканирование запущено', message: 'Процесс запущен в фоновом режиме. Вы можете следить за статусом здесь или в разделе «История».', color: 'blue' });
       setTimeout(() => checkStatus(res.data.scan_id), 3000);
@@ -204,18 +207,48 @@ export default function ScanPage() {
       }
     }
 
-    // Сортировка нарушений внутри групп будет фиксированной (по типу)
     return filtered;
-  }, [result, typeFilter, searchFilter, trademarks]);
+  }, [result, trademarks, searchFilter, typeFilter]);
 
-  // FIX: Используем сгруппированные данные с backend вместо локальной группировки
-  // const groupedViolations = useMemo(() => { ... });  // УДАЛЕНО - теперь используем state
-  
-  // Пагинация для сгруппированных данных
+  // Фильтрация сгруппированных данных
+  const filteredGrouped = useMemo(() => {
+    let filtered = [...groupedViolations];
+
+    // Динамическая фильтрация по списком брендов
+    const trademarkNormalForms = new Set(trademarks.map(t => t.normal_form));
+
+    filtered = filtered.map(v => {
+      if ((v.type === 'foreign_word' || v.type === 'unrecognized_word' || v.type === 'possible_trademark') && v.normal_form) {
+        if (trademarkNormalForms.has(v.normal_form)) {
+          return { ...v, type: 'trademark' };
+        }
+      }
+      return v;
+    });
+
+    // Фильтр по типу
+    if (typeFilter.length > 0) {
+      filtered = filtered.filter(v => typeFilter.includes(v.type));
+    }
+
+    // Фильтр по поиску (уже применен к основной таблице, но для группировки дублируем если нужно)
+    if (searchFilter) {
+      const q = searchFilter.toLowerCase();
+      filtered = filtered.filter(v => 
+        (v.word && v.word.toLowerCase().includes(q)) ||
+        (v.text_context && v.text_context.toLowerCase().includes(q)) ||
+        (v.page_url && v.page_url.toLowerCase().includes(q))
+      );
+    }
+
+    return filtered;
+  }, [groupedViolations, typeFilter, searchFilter, trademarks]);
+
+  // Пагинация для отфильтрованных сгруппированных данных
   const paginatedGrouped = useMemo(() => {
     const start = (activePage - 1) * itemsPerPage;
-    return groupedViolations.slice(start, start + itemsPerPage);
-  }, [groupedViolations, activePage, itemsPerPage]);
+    return filteredGrouped.slice(start, start + itemsPerPage);
+  }, [filteredGrouped, activePage, itemsPerPage]);
 
   const translateType = (type: string) => {
     switch(type) {
@@ -323,6 +356,16 @@ export default function ScanPage() {
               w={80}
             />
           </Tooltip>
+          <Tooltip label="Лимит страниц для проверки (1-1000)" withArrow position="top">
+            <NumberInput
+              label="Лимит страниц"
+              min={1}
+              max={1000}
+              value={maxPages}
+              onChange={setMaxPages}
+              w={120}
+            />
+          </Tooltip>
         </Group>
         <Group mt="md" justify="flex-end">
           <Button 
@@ -355,8 +398,20 @@ export default function ScanPage() {
           </SimpleGrid>
 
           {result.status === 'in_progress' && (
-            <Alert icon={<IconSearch size={16} />} title={`Идет сканирование... (проверено ${result.pages?.length || 0} стр.)`} color="blue">
-              <Progress value={result.pages?.length ? Math.min(100, (result.pages.length / 100) * 100) : 10} animated mt="sm" />
+            <Alert icon={<IconSearch size={16} />} title={`Идет сканирование...`} color="blue">
+              <Stack gap="xs">
+                <Text size="sm">
+                  Обработано: {result.summary.total_pages} {result.summary.total_pages === 1 ? 'страница' : result.summary.total_pages < 5 ? 'страницы' : 'страниц'}
+                  {result.summary.pending_pages ? ` (+ ${result.summary.pending_pages} в очереди)` : ''}
+                </Text>
+                <Progress 
+                  value={result.summary.total_pages + (result.summary.pending_pages || 0) > 0 
+                    ? (result.summary.total_pages / (result.summary.total_pages + (result.summary.pending_pages || 0)) * 100) 
+                    : 10} 
+                  animated 
+                  mt="sm" 
+                />
+              </Stack>
             </Alert>
           )}
 
@@ -467,10 +522,10 @@ export default function ScanPage() {
                 </Table>
               </div>
 
-              {groupedViolations.length > itemsPerPage && (
+              {filteredGrouped.length > itemsPerPage && (
                 <Group justify="center" p="md" mt="md">
                   <Pagination 
-                    total={Math.ceil(groupedViolations.length / itemsPerPage)} 
+                    total={Math.ceil(filteredGrouped.length / itemsPerPage)} 
                     value={activePage} 
                     onChange={setPage} 
                   />

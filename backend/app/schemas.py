@@ -65,6 +65,7 @@ class ScanSummary(BaseModel):
     total_pages: int = 0
     pages_with_violations: int = 0
     total_violations: int = 0
+    pending_pages: int = 0
 
 
 class ScanStatusResponse(BaseModel):

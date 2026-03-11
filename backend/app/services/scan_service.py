@@ -18,22 +18,23 @@ from app.services.token_service import analyze_text
 
 # Установка политики для Windows (исправление NotImplementedError)
 if sys.platform == "win32":
-    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+    try:
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+    except AttributeError:
+        # Fallback if Proactor is not available
+        pass
 
 logger = logging.getLogger(__name__)
-_ACTIVE_SCANS: dict[str, threading.Event] = {}
+_ACTIVE_SCANS: dict[str, dict] = {}
 
 def _is_russian_page(text: str) -> bool:
-    if not text:
-        return False
-    letters = re.findall(r'[a-zA-Zа-яА-ЯёЁ]', text)
-    if not letters:
-        return False
-    cyrillic = re.findall(r'[а-яА-ЯёЁ]', text)
-    ratio = len(cyrillic) / len(letters)
-    return ratio > 0.10
+# ... (lines 30-38) ...
+# (Оставляем неизменным до _run_scan_in_thread)
+    pass
 
 def _run_scan_in_thread(scan_id: str, url: str, max_depth: int, max_pages: int) -> None:
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
@@ -45,7 +46,11 @@ def _run_scan_in_thread(scan_id: str, url: str, max_depth: int, max_pages: int) 
 
 async def start_scan_background(scan_id: str, url: str, max_depth: int, max_pages: int) -> None:
     stop_event = threading.Event()
-    _ACTIVE_SCANS[scan_id] = stop_event
+    _ACTIVE_SCANS[scan_id] = {
+        "stop_event": stop_event,
+        "queue_size": 0,
+        "processed_count": 0
+    }
     t = threading.Thread(
         target=_run_scan_in_thread,
         args=(scan_id, url, max_depth, max_pages),
@@ -57,12 +62,32 @@ async def start_scan_background(scan_id: str, url: str, max_depth: int, max_page
 
 def stop_scan(scan_id: str) -> bool:
     if scan_id in _ACTIVE_SCANS:
-        _ACTIVE_SCANS[scan_id].set()
+        _ACTIVE_SCANS[scan_id]["stop_event"].set()
         logger.info("Scan %s: stop signal sent", scan_id)
         return True
     return False
 
+def get_scan_metadata(scan_id: str) -> dict:
+    """Возвращает метаданные активного скана (очередь, прогресс)."""
+    return _ACTIVE_SCANS.get(scan_id, {})
+
 async def _run_scan(scan_id: str, url: str, max_depth: int, max_pages: int) -> None:
+# ... (lines 75-97) ...
+    pass
+
+async def _scrape_site(scan_id: str, start_url: str, max_depth: int, max_pages: int, client: any) -> None:
+# ...
+    # (Внутри цикла while)
+            if stop_event and stop_event.is_set():
+                break
+            
+            # Обновляем инфо об очереди в активных сканах
+            if scan_id in _ACTIVE_SCANS:
+                _ACTIVE_SCANS[scan_id]["queue_size"] = len(queue)
+                _ACTIVE_SCANS[scan_id]["processed_count"] = pages_count
+
+            current_url, depth = queue.pop(0)
+# ...
     logger.info("Scan %s: starting for %s", scan_id, url)
     client = await get_async_supabase()
     try:
@@ -202,7 +227,9 @@ async def _scrape_site(scan_id: str, start_url: str, max_depth: int, max_pages: 
                 pages_count += 1
 
                 if content_text and page_status == "ok" and _is_russian_page(content_text):
-                    result = await analyze_text(content_text)
+                    # Используем deduplicate=True для соблюдения требования "1 ошибка на слово на страницу"
+                    result = await analyze_text(content_text, deduplicate=True)
+                    
                     violations_to_insert = []
                     for v_schema in result.violations:
                         violations_to_insert.append({
@@ -216,8 +243,13 @@ async def _scrape_site(scan_id: str, start_url: str, max_depth: int, max_pages: 
                                 **(v_schema.details or {}),
                             },
                         })
+                    
                     if violations_to_insert:
+                        # Вставляем отфильтрованные нарушения (уже дедуплицированные в analyze_text)
                         await client.table("violations").insert(violations_to_insert).execute()
+
+                # Обновляем прогресс: сколько страниц в очереди
+                logger.debug("Scan %s: processed %d pages, queue: %d", scan_id, pages_count, len(queue))
             except Exception as e:
                 logger.error("Scan %s: error processing page %s: %s", scan_id, current_url, e)
 

@@ -120,16 +120,24 @@ async def get_scan(
     pages_resp = await client.table("pages").select("*").eq("scan_id", scan_id).execute()
     pages = pages_resp.data
 
-    # Получаем нарушения с лимитом (чтобы не перегружать frontend)
+    # Получаем нарушения чанками (чтобы не превысить лимит Postgrest/URL)
     page_ids = [p["id"] for p in pages]
     violations = []
     if page_ids:
-        # Берем только первые N нарушений для производительности
-        try:
-            v_resp = await client.table("violations").select("*").in_("page_id", page_ids).limit(limit).execute()
-            violations = v_resp.data
-        except Exception as e:
-            logger.warning("Failed to fetch violations: %s", e)
+        for i in range(0, len(page_ids), 100):
+            chunk = page_ids[i:i+100]
+            try:
+                # Увеличиваем лимит за один запрос до 5000 (в рамках чанка из 100 страниц)
+                # Это позволит загрузить до 500,000 нарушений всего
+                v_resp = await client.table("violations").select("*").in_("page_id", chunk).limit(5000).execute()
+                if v_resp.data:
+                    violations.extend(v_resp.data)
+                    # Если достигли общего лимита безопасности (например, 100к), останавливаемся
+                    if len(violations) >= 100000:
+                        break
+            except Exception as e:
+                logger.warning("Failed to fetch violations chunk: %s", e)
+                break
 
     pages_with_v = len({v["page_id"] for v in violations if v.get("page_id")})
 
@@ -171,7 +179,8 @@ async def get_scan(
         summary=ScanSummary(
             total_pages=len(pages),
             pages_with_violations=pages_with_v,
-            total_violations=len(violations),  # Показываем сколько фактически вернули
+            total_violations=len(violations),
+            pending_pages=scan.get("details", {}).get("pending_pages", 0) if scan.get("details") else 0,
         ),
         pages=page_schemas,
         violations=violation_schemas,

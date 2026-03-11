@@ -157,9 +157,10 @@ def _is_roman_numeral(word: str) -> bool:
     return bool(_ROMAN_RE.match(word))
 
 
-async def analyze_text(text: str, client: any = None) -> CheckTextResponse:
+async def analyze_text(text: str, client: any = None, deduplicate: bool = False) -> CheckTextResponse:
     """
     Анализирует текст и формирует violations.
+    Если deduplicate=True, для каждой комбинации (тип, нормальная форма) возвращается только одно нарушение.
     """
     if client is None:
         client = await get_async_supabase()
@@ -169,6 +170,7 @@ async def analyze_text(text: str, client: any = None) -> CheckTextResponse:
 
     tokens = tokenize(text)
     violations: list[ViolationSchema] = []
+    seen_violations = set() if deduplicate else None
 
     # Предварительно загружаем данные обо всех токенах одним батчем через REST
     words_sources, trademarks_set, db_exceptions = await _load_batch_data(tokens, client)
@@ -231,6 +233,12 @@ async def analyze_text(text: str, client: any = None) -> CheckTextResponse:
                         v_type = "foreign_word"
                         v_info = "Иностранное заимствование (англицизм) на кириллице"
 
+                    # Проверка на дубликаты
+                    if deduplicate:
+                        if normal_form in seen_violations:
+                            continue
+                        seen_violations.add(normal_form)
+
                     violations.append(
                         ViolationSchema(
                             id=str(uuid.uuid4()),
@@ -253,6 +261,12 @@ async def analyze_text(text: str, client: any = None) -> CheckTextResponse:
         v_type = "foreign_word"
         if raw_text[0].isupper():
             v_type = "possible_trademark"
+
+        # Проверка на дубликаты
+        if deduplicate:
+            if normal_form in seen_violations:
+                continue
+            seen_violations.add(normal_form)
 
         violations.append(
             ViolationSchema(
