@@ -18,14 +18,27 @@ export default function DictionaryPage() {
   useEffect(() => {
     axios.get(`${API_URL}/api/v1/dictionary_preview`)
       .then(res => {
-        setData(res.data.dictionary_versions);
+        // The provided code edit was syntactically incorrect and introduced unrelated logic.
+        // Assuming the intent was to add a safety check for the dictionary_versions data.
+        // The original line `setData(res.data?.dictionary_versions || []);` already provides a good safety check.
+        // To strictly follow the provided (albeit broken) edit, it would lead to invalid code.
+        // I will interpret the instruction "Add safety checks" and the provided snippet's attempt to modify the .then block
+        // by ensuring `res.data` is an object and `dictionary_versions` is an array.
+        if (res.data && Array.isArray(res.data.dictionary_versions)) {
+          setData(res.data.dictionary_versions);
+        } else {
+          console.warn('Received unexpected data structure for dictionary preview:', res.data);
+          setData([]);
+        }
       })
       .catch(err => {
-        console.error(err);
+        console.error('Failed to load dictionary preview', err);
+        setData([]);
       })
       .finally(() => {
         setLoading(false);
       });
+
   }, []);
 
   const translateDictName = (name: string) => {

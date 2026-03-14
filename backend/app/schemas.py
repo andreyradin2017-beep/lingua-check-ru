@@ -38,21 +38,20 @@ class PageSchema(BaseModel):
     model_config = {"from_attributes": True}
 
 
-# ---------------------------------------------------------------------------
-# Scan
-# ---------------------------------------------------------------------------
+from app.utils.validation import is_valid_url
+
 class ScanStartRequest(BaseModel):
     url: str
-    max_depth: int = Field(default=3, ge=1, le=5)  # specs/security.md
+    max_depth: int = Field(default=3, ge=0, le=5)  # specs/security.md
     max_pages: int = Field(default=100, ge=1, le=1000)  # specs/security.md
 
     @field_validator("url")
     @classmethod
     def validate_url(cls, v: str) -> str:
-        if not v.startswith(("http://", "https://")):
-            raise ValueError("URL должен начинаться с http:// или https://")
-        if v.startswith(("javascript:", "data:")):
-            raise ValueError("Scheme не допустима")
+        if not is_valid_url(v):
+            raise ValueError("Некорректный формат URL. Должен начинаться с http:// или https://")
+        if v.lower().startswith(("javascript:", "data:")):
+            raise ValueError("Схема URL не допустима")
         return v
 
 

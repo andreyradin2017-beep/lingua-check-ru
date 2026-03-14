@@ -210,6 +210,7 @@ class Violation(Base):
     __table_args__ = (
         Index("idx_violations_page_id", "page_id"),
         Index("idx_violations_text_id", "text_id"),
+        Index("idx_violations_token_id", "token_id"),  # FIX #12: индекс для token_id
         Index("idx_violations_page_type", "page_id", "type"),  # C3: для быстрой фильтрации по типу
     )
 

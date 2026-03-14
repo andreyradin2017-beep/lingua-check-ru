@@ -5,10 +5,10 @@
 }
 
 body {
-  background-color: #f8f9fa;
+  background-color: var(--mantine-color-body);
+  color: var(--mantine-color-text);
   -webkit-font-smoothing: antialiased;
-  /* FIX #4: Явное задание цвета dimmed текста */
-  color: #343a40;
+  margin: 0;
 }
 
 /* FIX #8: Уважать prefers-reduced-motion */

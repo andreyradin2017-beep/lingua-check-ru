@@ -12,12 +12,19 @@ class Settings(BaseSettings):
     max_pages_limit: int = 1000
     max_file_size_mb: int = 10
 
+    # Playwright настройки (FIX #11: вынесено в конфиг)
+    playwright_timeout_ms: int = 60000
+    playwright_wait_until: str = "domcontentloaded"
+    playwright_headless: bool = True
+
     supabase_url: str = ""
     supabase_key: str = ""
+    redis_url: str = "redis://localhost:6379/0"
+    celery_task_always_eager: bool = True
 
     # CORS
     cors_origins: list[str] = [
-        "http://localhost:5173", 
+        "http://localhost:5173",
         "http://localhost:3000",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:3000"

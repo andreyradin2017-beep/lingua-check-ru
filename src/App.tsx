@@ -1,7 +1,7 @@
-import { AppShell, Burger, Group, NavLink, Title, Text, Container, Stack } from '@mantine/core';
+import { AppShell, Burger, Group, NavLink, Title, Text, Container, Stack, ActionIcon, Tooltip, useMantineColorScheme } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import { IconGlobe, IconFileText, IconBooks, IconHome, IconSearch, IconHistory, IconX } from '@tabler/icons-react';
+import { IconGlobe, IconFileText, IconBooks, IconHome, IconSearch, IconHistory, IconX, IconSun, IconMoon } from '@tabler/icons-react';
 import { HelmetProvider } from 'react-helmet-async';
 
 // Импортируем страницы (создадим их следом)
@@ -16,6 +16,7 @@ import NotFoundPage from './pages/NotFoundPage';
 export default function App() {
   const [opened, { toggle }] = useDisclosure();
   const [desktopOpened, { toggle: toggleDesktop }] = useDisclosure(true);
+  const { toggleColorScheme } = useMantineColorScheme();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -31,14 +32,15 @@ export default function App() {
   return (
     <HelmetProvider>
       <AppShell
-        header={{ height: 60 }}
+        header={{ height: 70 }}
         navbar={{
-          width: desktopOpened ? 300 : 80,
+          width: desktopOpened ? 280 : 80,
           breakpoint: 'sm',
-          collapsed: { mobile: !opened },
+          collapsed: { mobile: !opened, desktop: !desktopOpened },
         }}
         padding="md"
       >
+
       <AppShell.Header>
         <Group h="100%" px="md" justify="space-between">
           <Group>
@@ -47,7 +49,20 @@ export default function App() {
             <IconSearch color="var(--mantine-color-blue-6)" size={28} />
             <Title order={3} className="gradient-text">LinguaCheck RU</Title>
           </Group>
-          <Text size="xs" c="dimmed" visibleFrom="xs">ФЗ №168‑ФЗ: Государственный язык РФ</Text>
+          <Group gap="sm">
+            <Text size="xs" c="dimmed" visibleFrom="xs">ФЗ №168‑ФЗ: Государственный язык РФ</Text>
+            <Tooltip label="Переключить тему">
+              <ActionIcon
+                variant="subtle"
+                size="sm"
+                onClick={() => toggleColorScheme()}
+                aria-label="Переключить тему"
+              >
+                <IconSun size={18} className="mantine-dark-hidden" />
+                <IconMoon size={18} className="mantine-light-hidden" />
+              </ActionIcon>
+            </Tooltip>
+          </Group>
         </Group>
       </AppShell.Header>
 
@@ -60,9 +75,10 @@ export default function App() {
               label={desktopOpened ? item.label : null}
               leftSection={item.icon}
               active={location.pathname === item.path}
+
               onClick={() => {
                 navigate(item.path);
-                if (opened) toggle();
+                if (opened) toggle(); // Close mobile drawer if it was opened
               }}
               variant="light"
               styles={{
@@ -74,7 +90,7 @@ export default function App() {
         </Stack>
       </AppShell.Navbar>
 
-      <AppShell.Main bg="gray.0">
+      <AppShell.Main>
         <Container size="xl" py="lg">
           <Routes>
             <Route path="/" element={<HomePage />} />

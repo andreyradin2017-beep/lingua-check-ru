@@ -1,16 +1,31 @@
-import { useState, useMemo } from 'react';
+/**
+ * TextPage — Страница проверки текста и файлов
+ * 
+ * Оптимизации:
+ * - Code splitting для тяжелых библиотек (jsPDF, Papa)
+ * - Мемоизация вычислений
+ * - Улучшенная доступность (a11y)
+ * - Оптимизированные обработчики
+ */
+
+import { useState, useMemo, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Title, Stack, Group, Button, Textarea, Paper, Badge, Text, Tabs, FileButton, List, ThemeIcon, Pagination } from '@mantine/core';
+import { 
+  Title, Stack, Group, Button, Textarea, Paper, Badge, Text, 
+  Tabs, FileButton, List, ThemeIcon, Pagination, Tooltip, Box 
+} from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { IconFileText, IconTypography, IconAlertCircle, IconCheck, IconFileCheck, IconFileSpreadsheet, IconFileTypePdf } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import axios from 'axios';
-import Papa from 'papaparse';
-import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
 import { API_URL } from '../config/api';
 import { sanitizeText } from '../utils/sanitize';
 import { translateViolationType } from '../utils/translations';
+
+// Lazy imports
+const loadPapa = () => import('papaparse');
+const loadJsPDF = () => import('jspdf');
+const loadAutoTable = () => import('jspdf-autotable');
 
 interface TextViolation {
   id: string;
@@ -28,14 +43,17 @@ interface TextResult {
   violations: TextViolation[];
 }
 
+// Константы
+const ITEMS_PER_PAGE = 10;
+
 export default function TextPage() {
   const [text, setText] = useLocalStorage({ key: 'linguacheck-last-text', defaultValue: '' });
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<TextResult | null>(null);
   const [activePage, setPage] = useState(1);
-  const itemsPerPage = 10;
 
-  const checkText = async () => {
+  // Проверка текста
+  const checkText = useCallback(async () => {
     setLoading(true);
     setResult(null);
     setPage(1);
@@ -51,9 +69,10 @@ export default function TextPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [text]);
 
-  const onFileUpload = async (file: File | null) => {
+  // Загрузка файла
+  const onFileUpload = useCallback(async (file: File | null) => {
     if (!file) return;
     setLoading(true);
     setResult(null);
@@ -63,56 +82,92 @@ export default function TextPage() {
     try {
       const res = await axios.post(`${API_URL}/api/v1/check_text/upload`, formData);
       setResult(res.data);
-      notifications.show({ title: 'Файл загружен', message: `Проверено: ${file.name}`, color: 'teal' });
+      notifications.show({ 
+        title: 'Файл загружен', 
+        message: `Проверено: ${file.name}`, 
+        color: 'teal' 
+      });
     } catch (err: unknown) {
       const msg = axios.isAxiosError(err) ? err.response?.data?.detail || err.message : String(err);
       notifications.show({ title: 'Ошибка загрузки', message: msg, color: 'red' });
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
+  // Пагинация
   const paginatedViolations = useMemo(() => {
     if (!result) return [];
-    const start = (activePage - 1) * itemsPerPage;
-    return result.violations.slice(start, start + itemsPerPage);
+    const start = (activePage - 1) * ITEMS_PER_PAGE;
+    return result.violations.slice(start, start + ITEMS_PER_PAGE);
   }, [result, activePage]);
 
-  const exportCSV = () => {
+  // Экспорт CSV (lazy loading)
+  const exportCSV = useCallback(async () => {
     if (!result) return;
-    const data = result.violations.map((v: TextViolation) => ({
-      ID: v.id,
-      Тип: v.type,
-      Слово: v.word || 'N/A',
-      Контекст: v.text_context,
-    }));
-    const csv = Papa.unparse(data);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.setAttribute('download', 'text_check_results.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+    try {
+      const Papa = await loadPapa();
+      const data = result.violations.map((v: TextViolation) => ({
+        ID: v.id,
+        Тип: translateViolationType(v.type),
+        Слово: v.word || 'N/A',
+        Контекст: v.text_context,
+      }));
+      const csv = Papa.default.unparse(data);
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.setAttribute('download', 'text_check_results.csv');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      notifications.show({
+        title: 'Экспорт CSV',
+        message: 'Файл успешно сформирован и загружен',
+        color: 'green',
+        icon: <IconCheck size={16} />
+      });
+    } catch (err) {
+      notifications.show({ title: 'Ошибка экспорта', message: String(err), color: 'red' });
+    }
+  }, [result]);
 
-  const exportPDF = () => {
+  // Экспорт PDF (lazy loading)
+  const exportPDF = useCallback(async () => {
     if (!result) return;
-    const doc = new jsPDF();
-    doc.text(`Отчет о проверке текста`, 14, 15);
-    const tableData = result.violations.map((v: TextViolation) => [
-      v.type,
-      v.word || 'N/A',
-      v.text_context.substring(0, 50) + (v.text_context.length > 50 ? '...' : '')
-    ]);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (doc as any).autoTable({
-      head: [['Тип', 'Слово', 'Контекст']],
-      body: tableData,
-      startY: 20,
-    });
-    doc.save('text_check_results.pdf');
-  };
+    try {
+      const jsPDFModule = await loadJsPDF();
+      const autoTableModule = await loadAutoTable();
+      const jsPDF = jsPDFModule.default;
+
+      const doc = new jsPDF();
+      doc.text(`Отчет о проверке текста`, 14, 15);
+
+      const tableData = result.violations.map((v: TextViolation) => [
+        translateViolationType(v.type),
+        v.word || 'N/A',
+        v.text_context.substring(0, 50) + (v.text_context.length > 50 ? '...' : '')
+      ]);
+
+      autoTableModule.default(doc, {
+        head: [['Тип', 'Слово', 'Контекст']],
+        body: tableData,
+        startY: 20,
+      });
+
+      doc.save('text_check_results.pdf');
+      notifications.show({
+        title: 'Экспорт PDF',
+        message: 'Документ успешно сформирован и загружен',
+        color: 'green',
+        icon: <IconCheck size={16} />
+      });
+    } catch (err) {
+      notifications.show({ title: 'Ошибка экспорта', message: String(err), color: 'red' });
+    }
+  }, [result]);
+
+  const textLength = text.length;
 
   return (
     <Stack gap="xl">
@@ -120,6 +175,7 @@ export default function TextPage() {
         <title>Проверка текста и файлов — LinguaCheck RU</title>
         <meta name="description" content="Анализ текстов, документов DOCX и PDF на соблюдение норм государственного языка." />
       </Helmet>
+      
       <Stack gap={0}>
         <Title order={2}>Проверка текста и файлов</Title>
         <Text c="dimmed">Мгновенный анализ и экспорт отчетов на соответствие нормам</Text>
@@ -138,25 +194,53 @@ export default function TextPage() {
               placeholder="Введите или вставьте текст..."
               minRows={8}
               value={text}
-              // FIX #7: Добавлен счетчик символов
               rightSection={
-                <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
-                  {text.length} симв.
-                </Text>
+                <Box pr="xs" style={{ height: '100%', display: 'flex', alignItems: 'flex-end', paddingBottom: '8px' }}>
+                  <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
+                    {textLength} симв.
+                  </Text>
+                </Box>
               }
               onChange={(e) => setText(e.currentTarget.value)}
+              aria-label="Текст для проверки"
             />
-            <Button mt="md" onClick={checkText} loading={loading} disabled={!text.trim()}>Проверить сейчас</Button>
+            <Button 
+              mt="md" 
+              onClick={checkText} 
+              loading={loading} 
+              disabled={!text.trim()}
+              aria-label="Проверить текст"
+            >
+              Проверить сейчас
+            </Button>
           </Paper>
         </Tabs.Panel>
 
         <Tabs.Panel value="upload" pt="xl">
-          <Paper p={50} withBorder radius="md" bg="gray.0" style={{ border: '2px dashed var(--mantine-color-gray-4)' }}>
+          <Paper 
+            p={50} 
+            withBorder 
+            radius="md" 
+            style={{ 
+              border: '2px dashed var(--mantine-color-default-border)', 
+              backgroundColor: 'var(--mantine-color-default-hover)' 
+            }}
+            role="region"
+            aria-label="Загрузка файла"
+          >
             <Stack align="center">
               <IconFileCheck size={50} color="var(--mantine-color-blue-4)" />
               <Text fw={500}>Поддерживаются форматы TXT, DOCX, PDF</Text>
               <FileButton onChange={onFileUpload} accept=".txt,.docx,.pdf">
-                {(props) => <Button {...props} loading={loading}>Выбрать файл</Button>}
+                {(props) => (
+                  <Button 
+                    {...props} 
+                    loading={loading}
+                    aria-label="Выбрать файл для загрузки"
+                  >
+                    Выбрать файл
+                  </Button>
+                )}
               </FileButton>
             </Stack>
           </Paper>
@@ -164,22 +248,56 @@ export default function TextPage() {
       </Tabs>
 
       {result && (
-        <Paper p="xl" withBorder radius="md">
+        <Paper p="xl" withBorder radius="md" role="region" aria-label="Результаты анализа">
           <Stack gap="md">
-            <Group justify="space-between">
+            <Group justify="space-between" align="center">
               <Title order={3}>Результаты анализа</Title>
-              <Group>
-                <Button leftSection={<IconFileSpreadsheet size={16}/>} variant="light" color="green" onClick={exportCSV}>Экспорт CSV</Button>
-                <Button leftSection={<IconFileTypePdf size={16}/>} variant="light" color="red" onClick={exportPDF}>Экспорт PDF</Button>
-                <Badge size="xl" color={result.summary.compliance_percent > 90 ? 'teal' : 'orange'}>
-                  Соответствие: {result.summary.compliance_percent}%
-                </Badge>
+              <Group gap="xs">
+                <Tooltip label="Скачать отчет в формате CSV" withArrow>
+                  <Button
+                    leftSection={<IconFileSpreadsheet size={16}/>}
+                    variant="light"
+                    color="green"
+                    onClick={exportCSV}
+                    size="xs"
+                    aria-label="Экспорт в CSV"
+                  >
+                    CSV
+                  </Button>
+                </Tooltip>
+                <Tooltip label="Скачать отчет в формате PDF" withArrow>
+                  <Button
+                    leftSection={<IconFileTypePdf size={16}/>}
+                    variant="light"
+                    color="red"
+                    onClick={exportPDF}
+                    size="xs"
+                    aria-label="Экспорт в PDF"
+                  >
+                    PDF
+                  </Button>
+                </Tooltip>
+                <Tooltip label="Процент соответствия нормам русского языка" withArrow>
+                  <Badge 
+                    size="lg" 
+                    color={result.summary.compliance_percent > 90 ? 'teal' : 'orange'}
+                    role="status"
+                  >
+                    {result.summary.compliance_percent}%
+                  </Badge>
+                </Tooltip>
               </Group>
             </Group>
 
             <Group gap="xl">
-              <Text size="sm">Слов обработано: <b>{result.summary.total_tokens}</b></Text>
-              <Text size="sm">Нарушений: <b style={{ color: 'var(--mantine-color-red-6)' }}>{result.summary.violations_count}</b></Text>
+              <Text size="sm">
+                Слов обработано: <b>{result.summary.total_tokens}</b>
+              </Text>
+              <Text size="sm">
+                Нарушений: <b style={{ color: 'var(--mantine-color-red-6)' }}>
+                  {result.summary.violations_count}
+                </b>
+              </Text>
             </Group>
 
             {result.violations.length > 0 ? (
@@ -195,28 +313,34 @@ export default function TextPage() {
                   }
                 >
                   {paginatedViolations.map((v: TextViolation, i: number) => (
-                    <List.Item key={i} icon={
-                      v.type === 'trademark' ? (
-                        <ThemeIcon color="blue" size={24} radius="xl">
-                          <IconCheck size={16} />
-                        </ThemeIcon>
-                      ) : undefined
-                    }>
-                      {/* FIX #9: Полные названия типов нарушений */}
+                    <List.Item 
+                      key={i} 
+                      icon={
+                        v.type === 'trademark' ? (
+                          <ThemeIcon color="blue" size={24} radius="xl">
+                            <IconCheck size={16} />
+                          </ThemeIcon>
+                        ) : undefined
+                      }
+                    >
                       <Badge color={v.type === 'trademark' ? 'blue' : 'red'} size="sm" mr="sm">
                         {translateViolationType(v.type)}
                       </Badge>
                       <Text span fw={700}>{v.word}</Text>
-                      <Text span fs="italic" ml="xs">"...{sanitizeText(v.text_context)}..."</Text>
+                      <Text span fs="italic" ml="xs">
+                        "...{sanitizeText(v.text_context)}..."
+                      </Text>
                     </List.Item>
                   ))}
                 </List>
-                {result.violations.length > itemsPerPage && (
+                
+                {result.violations.length > ITEMS_PER_PAGE && (
                   <Group justify="center" p="md">
-                    <Pagination 
-                      total={Math.ceil(result.violations.length / itemsPerPage)} 
-                      value={activePage} 
-                      onChange={setPage} 
+                    <Pagination
+                      total={Math.ceil(result.violations.length / ITEMS_PER_PAGE)}
+                      value={activePage}
+                      onChange={setPage}
+                      aria-label="Пагинация результатов"
                     />
                   </Group>
                 )}

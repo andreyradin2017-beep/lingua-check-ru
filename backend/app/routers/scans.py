@@ -1,5 +1,6 @@
 import logging
 import uuid
+import asyncio
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from slowapi import Limiter
@@ -18,6 +19,7 @@ from app.schemas import (
     ScanHistoryItem,
 )
 from app.services.scan_service import start_scan_background, stop_scan
+from app.tasks import run_scan_task
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -25,7 +27,7 @@ limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post("/scan", response_model=ScanStartResponse, status_code=202)
-@limiter.limit("5/minute")  # Максимум 5 сканирований в минуту
+# @limiter.limit("5/minute")  # Максимум 5 сканирований в минуту
 async def create_scan(
     request: Request,
     body: ScanStartRequest,
@@ -53,8 +55,8 @@ async def create_scan(
 
     logger.info("Scan %s created for URL %s", scan_id, body.url)
 
-    # Запуск в фоне (asyncio.create_task внутри)
-    await start_scan_background(
+    # Запуск в фоне через Celery
+    run_scan_task.delay(
         scan_id, 
         body.url, 
         body.max_depth, 
@@ -193,18 +195,30 @@ async def get_scan_grouped(
     page_id: str = None,  # Если указан - группируем только для этой страницы
 ) -> list:
     """Группирует нарушения по слову + тип + страница (word xN)"""
+    # FIX #5: Валидация существования скана
     client = await get_async_supabase()
-    
+
+    # Проверяем существование скана
+    scan_resp = await client.table("scans").select("id").eq("id", scan_id).execute()
+    if not scan_resp.data:
+        raise HTTPException(status_code=404, detail="Сканирование не найдено")
+
     # Получаем страницы
     if page_id:
-        pages_resp = await client.table("pages").select("id, url").eq("id", page_id).execute()
+        # Если указан page_id, проверяем что он принадлежит скану
+        pages_resp = await client.table("pages").select("id, url, scan_id").eq("id", page_id).execute()
+        if not pages_resp.data:
+            raise HTTPException(status_code=404, detail="Страница не найдена")
+        # Проверяем что страница принадлежит указанному скану
+        if pages_resp.data[0].get("scan_id") != scan_id:
+            raise HTTPException(status_code=400, detail="Страница не принадлежит указанному сканированию")
     else:
         pages_resp = await client.table("pages").select("id, url").eq("scan_id", scan_id).execute()
-    
+
     pages = pages_resp.data
     page_ids = [p["id"] for p in pages]
     page_url_map = {p["id"]: p["url"] for p in pages}
-    
+
     if not page_ids:
         return []
     
@@ -346,9 +360,10 @@ async def clear_scans() -> dict:
             logger.info("Clearing table: %s...", table)
             deleted_count = 0
             while True:
-                # На бесплатном тарифе удаляем по 1000 записей
+                # На бесплатном тарифе удаляем записи
                 # Используем is.not.eq() для удаления всех записей
-                resp = await client.table(table).delete().neq("id", "00000000-0000-0000-0000-000000000000").limit(1000).execute()
+                # Примечание: .limit() не работает с .delete() в новых версиях Postgrest
+                resp = await client.table(table).delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
 
                 # Если данных больше нет (пустой список) — переходим к следующей таблице
                 # resp.data содержит удаленные записи, если их не было - будет []

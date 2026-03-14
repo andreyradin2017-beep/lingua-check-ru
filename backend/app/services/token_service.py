@@ -1,10 +1,12 @@
 import logging
 import uuid
 import re
+import asyncio
 
 from app.core.analysis import tokenize
 from app.supabase_client import get_async_supabase
 from app.schemas import CheckTextResponse, CheckTextSummary, ViolationSchema
+from app.services.redis_service import redis_service
 
 logger = logging.getLogger(__name__)
 
@@ -74,56 +76,122 @@ def _get_technical_word_parts(text: str) -> set[str]:
     return technical_parts
 
 
-async def _load_batch_data(tokens: list[dict], client: any = None) -> tuple[dict[str, set[str]], set[str]]:
+# Глобальный кэш для ускорения сканирования (In-memory)
+_WORDS_CACHE: dict[str, set[str]] = {}
+_TRADEMARKS_CACHE: set[str] = set()
+_EXCEPTIONS_CACHE: set[str] = set()
+_CACHE_INITIALIZED = False
+
+async def _load_batch_data(tokens: list[dict], client: any = None) -> tuple[dict[str, set[str]], set[str], set[str]]:
     """
-    Загружает все необходимые данные для токенов через Supabase REST API.
+    Загружает все необходимые данные для токенов через Supabase REST API с использованием кэширования.
+    Возвращает: (words_sources, trademarks_set, global_exceptions)
     """
+    global _CACHE_INITIALIZED, _EXCEPTIONS_CACHE
+
     if client is None:
         client = await get_async_supabase()
 
+    # 1. Загружаем исключения (пробуем из Redis, иначе из БД)
+    if not _CACHE_INITIALIZED:
+        try:
+            cached_exceptions = await redis_service.get("lingua:exceptions")
+            if cached_exceptions:
+                _EXCEPTIONS_CACHE = set(cached_exceptions)
+                _CACHE_INITIALIZED = True
+                logger.info("Global exceptions loaded from Redis")
+            else:
+                ge_resp = await client.table("global_exceptions").select("word").execute()
+                _EXCEPTIONS_CACHE = {item["word"].lower() for item in ge_resp.data}
+                await redis_service.set("lingua:exceptions", list(_EXCEPTIONS_CACHE), expire=86400) # 24h
+                _CACHE_INITIALIZED = True
+                logger.info("Global exceptions loaded from DB and cached to Redis")
+        except Exception as e:
+            logger.error("Error loading global_exceptions: %s", e)
+
     unique_nfs = {t["normal_form"] for t in tokens if t["language_hint"] == "ru" or t["raw_text"][0].isupper()}
     if not unique_nfs:
-        return {}, set()
+        return {}, set(), _EXCEPTIONS_CACHE
 
-    words_sources: dict[str, set[str]] = {}
-    trademarks_set: set[str] = set()
-    global_exceptions: set[str] = set()
-    
-    # Загружаем глобальные исключения
-    try:
-        ge_resp = await client.table("global_exceptions").select("word").execute()
-        for item in ge_resp.data:
-            global_exceptions.add(item["word"].lower())
-    except Exception as e:
-        logger.error("Error loading global_exceptions: %s", e)
+    # 2. Проверяем, что уже есть в локальном или Redis кэше
+    words_sources = {}
+    trademarks_set = set()
+    still_missing = []
 
-    # Чанкуем запросы по 200 элементов, чтобы не превысить лимит URL/памяти Postgrest
-    chunk_size = 200
-    unique_nfs_list = list(unique_nfs)
-    for i in range(0, len(unique_nfs_list), chunk_size):
-        chunk = unique_nfs_list[i : i + chunk_size]
+    for nf in unique_nfs:
+        # Сначала локальный RAM
+        if nf in _WORDS_CACHE:
+            if _WORDS_CACHE[nf]:
+                words_sources[nf] = _WORDS_CACHE[nf]
+            continue
+        if nf in _TRADEMARKS_CACHE:
+            trademarks_set.add(nf)
+            continue
         
-        # REST запрос 1: Словарные слова
-        try:
-            words_resp = await client.table("dictionary_words").select("normal_form, source_dictionary").in_("normal_form", chunk).execute()
-            for item in words_resp.data:
-                nf = item["normal_form"]
-                source = item["source_dictionary"]
-                if nf not in words_sources:
-                    words_sources[nf] = set()
-                words_sources[nf].add(source)
-        except Exception as e:
-            logger.error("Error loading dictionary_words chunk: %s", e)
+        # Затем Redis
+        redis_data = await redis_service.get(f"lingua:word:{nf}")
+        if redis_data:
+            if redis_data == "__NONE__":
+                _WORDS_CACHE[nf] = set() # Помечаем как проверенное пустое
+            elif redis_data == "__TM__":
+                _TRADEMARKS_CACHE.add(nf)
+                trademarks_set.add(nf)
+            else:
+                _WORDS_CACHE[nf] = set(redis_data)
+                words_sources[nf] = _WORDS_CACHE[nf]
+            continue
+            
+        still_missing.append(nf)
+    
+    if still_missing:
+        # Чанкуем запросы к Supabase
+        chunk_size = 200
+        for i in range(0, len(still_missing), chunk_size):
+            chunk = still_missing[i : i + chunk_size]
+            try:
+                words_task = client.table("dictionary_words").select("normal_form, source_dictionary").in_("normal_form", chunk).execute()
+                tm_task = client.table("trademarks").select("normal_form").in_("normal_form", chunk).execute()
+                
+                words_resp, tm_resp = await asyncio.gather(words_task, tm_task)
 
-        # REST запрос 2: Товарные знаки
-        try:
-            tm_resp = await client.table("trademarks").select("normal_form").in_("normal_form", chunk).execute()
-            for item in tm_resp.data:
-                trademarks_set.add(item["normal_form"])
-        except Exception as e:
-            logger.error("Error loading trademarks chunk: %s", e)
+                # Обрабатываем слова
+                found_in_chunk = set()
+                for item in words_resp.data:
+                    nf = item["normal_form"]
+                    source = item["source_dictionary"]
+                    if nf not in _WORDS_CACHE:
+                        _WORDS_CACHE[nf] = set()
+                    _WORDS_CACHE[nf].add(source)
+                    words_sources[nf] = _WORDS_CACHE[nf]
+                    found_in_chunk.add(nf)
+                
+                # Обрабатываем товарные знаки
+                for item in tm_resp.data:
+                    nf = item["normal_form"]
+                    _TRADEMARKS_CACHE.add(nf)
+                    trademarks_set.add(nf)
+                    found_in_chunk.add(nf)
+                    await redis_service.set(f"lingua:word:{nf}", "__TM__", expire=3600*12)
+                
+                # Сохраняем найденные слова в Redis
+                for nf in found_in_chunk:
+                    if nf in _WORDS_CACHE and _WORDS_CACHE[nf]:
+                        await redis_service.set(f"lingua:word:{nf}", list(_WORDS_CACHE[nf]), expire=3600*12)
 
-    return words_sources, trademarks_set, global_exceptions
+                # Помечаем отсутствующие, чтобы не дергать БД
+                for nf in chunk:
+                    if nf not in found_in_chunk:
+                        _WORDS_CACHE[nf] = set()
+                        await redis_service.set(f"lingua:word:{nf}", "__NONE__", expire=3600*12)
+
+            except Exception as e:
+                # FIX #10: Улучшенная обработка ошибок
+                logger.error("Error loading data chunk from Supabase: %s", e)
+                # Не прерываем обработку, продолжаем со следующими токенами
+                # Это позволяет частично обработать текст даже при ошибках БД
+                continue
+
+    return words_sources, trademarks_set, _EXCEPTIONS_CACHE
 
 
 def _is_anglicism(word: str) -> bool:
