@@ -567,7 +567,7 @@ export default function ScanPage() {
           {/* Форма сканирования */}
           <Paper p="xl" radius="lg" role="form" aria-label="Форма сканирования сайта">
             <Stack gap="xl">
-              <Grid gutter="lg">
+              <Grid gutter="lg" align="stretch">
                 <Grid.Col span={{ base: 12, md: 8 }}>
                   <TextInput
                     label="URL сайта"
@@ -579,28 +579,33 @@ export default function ScanPage() {
                     leftSection={<IconSearch size={18} />}
                     error={url && !url.startsWith('http') ? 'URL должен начинаться с http:// или https://' : null}
                     aria-required="true"
+                    h="100%"
                   />
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6, md: 2 }}>
                   <NumberInput
                     label="Глубина"
+                    description="От 0 до 5 уровней"
                     min={0}
                     max={5}
                     size="md"
                     value={depth}
                     onChange={(val) => setDepth(val)}
                     aria-describedby="depth-description"
+                    h="100%"
                   />
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6, md: 2 }}>
                   <NumberInput
                     label="Лимит страниц"
+                    description="Макс. 1000"
                     min={1}
                     max={1000}
                     size="md"
                     value={maxPages}
                     onChange={(val) => setMaxPages(val)}
                     aria-describedby="limit-description"
+                    h="100%"
                   />
                 </Grid.Col>
               </Grid>
