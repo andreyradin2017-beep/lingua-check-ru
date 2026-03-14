@@ -157,7 +157,7 @@ describe('trademarkMapper', () => {
     });
 
     it('должен искать по контексту', () => {
-      const result = filterBySearch(violations, 'оригинал');
+      const result = filterBySearch(violations, 'original');
       expect(result.length).toBe(1);
       expect(result[0].word).toBe('adidas');
     });

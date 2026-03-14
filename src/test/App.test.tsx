@@ -57,14 +57,14 @@ describe('App', () => {
     render(<App />, { wrapper: Wrapper });
     const dictLink = screen.getByText('Словари');
     fireEvent.click(dictLink);
-    expect(screen.getByText('Нормативные словари')).toBeInTheDocument();
+    expect(await screen.findByText('Нормативные словари')).toBeInTheDocument();
   });
 
   it('должен переключаться на страницу исключений при клике на "Исключения"', async () => {
     render(<App />, { wrapper: Wrapper });
     const excLink = screen.getByText('Исключения');
     fireEvent.click(excLink);
-    expect(screen.getByText('Глобальные исключения')).toBeInTheDocument();
+    expect(await screen.findByText('Глобальные исключения')).toBeInTheDocument();
   });
 
   it('должен показывать кнопку переключения темы', () => {
@@ -75,6 +75,9 @@ describe('App', () => {
 
   it('должен показывать текст о ФЗ №168-ФЗ', () => {
     render(<App />, { wrapper: Wrapper });
-    expect(screen.getByText(/ФЗ №168/i)).toBeInTheDocument();
+    // Используем getAllByText, так как текст может дублироваться в мобильном/десктопном меню
+    const elements = screen.getAllByText(/ФЗ №168/i);
+    expect(elements.length).toBeGreaterThan(0);
+    expect(elements[0]).toBeInTheDocument();
   });
 });

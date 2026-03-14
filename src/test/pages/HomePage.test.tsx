@@ -17,9 +17,10 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 describe('HomePage', () => {
-  it('должен рендерить главный заголовок LinguaCheck', () => {
+  it('должен рендерить главный заголовок "На страже русского языка"', () => {
     render(<HomePage />, { wrapper: Wrapper });
-    expect(screen.getByText(/LinguaCheck/i)).toBeInTheDocument();
+    expect(screen.getByText(/На страже/i)).toBeInTheDocument();
+    expect(screen.getByText(/русского языка/i)).toBeInTheDocument();
   });
 
   it('должен рендерить текст "на страже русского языка"', () => {

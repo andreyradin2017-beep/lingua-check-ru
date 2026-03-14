@@ -32,7 +32,7 @@ export const translateViolationType = (type: ViolationType | string): string => 
  */
 export const translateScanStatus = (status: ScanStatus | string): string => {
   const translations: Record<ScanStatus, string> = {
-    started: 'Ожидает обработки',
+    started: 'Запущено',
     in_progress: 'В процессе',
     completed: 'Завершено',
     failed: 'Ошибка',

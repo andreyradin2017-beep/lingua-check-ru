@@ -12,7 +12,7 @@ describe('sanitize', () => {
       expect(sanitizeText('<script>')).toBe('&lt;script&gt;');
       expect(sanitizeText('a & b')).toBe('a &amp; b');
       expect(sanitizeText('"test"')).toBe('&quot;test&quot;');
-      expect(sanitizeText("'test'")).toBe('&#x27;test;&#x2F;');
+      expect(sanitizeText("'test'")).toBe('&#x27;test&#x27;');
       expect(sanitizeText('a / b')).toBe('a &#x2F; b');
       expect(sanitizeText('a > b')).toBe('a &gt; b');
       expect(sanitizeText('a < b')).toBe('a &lt; b');
