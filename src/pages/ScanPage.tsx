@@ -251,6 +251,7 @@ export default function ScanPage() {
   const [trademarks, setTrademarks] = useState<Trademark[]>([]);
   const [activePage, setPage] = useState(1);
   const [searchParams] = useSearchParams();
+  const [scanError, setScanError] = useState<string | null>(null);
 
   // Фильтры с debouncing
   const [searchFilter, setSearchFilter] = useState("");
@@ -304,8 +305,9 @@ export default function ScanPage() {
   }, [result?.target_url, url]);
 
   // Проверка статуса сканирования с polling
-  const checkStatus = useCallback(async (id: string) => {
+  const checkStatus = useCallback(async (id: string, retryCount = 0) => {
     try {
+      setScanError(null);
       const res = await axios.get(`${API_URL}/api/v1/scan/${id}`);
       setResult(res.data);
 
@@ -330,15 +332,30 @@ export default function ScanPage() {
         ? err.response?.data?.detail || err.message || 'Ошибка загрузки данных'
         : 'Произошла неизвестная ошибка';
 
-      notifications.show({
-        title: 'Ошибка',
-        message: `Не удалось загрузить данные сканирования: ${msg}`,
-        color: 'red'
-      });
+      setScanError(msg);
+
+      // Retry logic с экспоненциальной задержкой
+      if (retryCount < 3) {
+        const retryDelay = Math.min(1000 * Math.pow(2, retryCount), 10000);
+        pollingTimeoutRef.current = setTimeout(() => checkStatus(id, retryCount + 1), retryDelay);
+      } else {
+        notifications.show({
+          title: 'Ошибка',
+          message: `Не удалось загрузить данные после 3 попыток: ${msg}`,
+          color: 'red',
+          autoClose: 10000,
+        });
+      }
 
       if (axios.isAxiosError(err) && err.response?.status) {
         const status = err.response.status;
-        if (status >= 400 && status !== 404) {
+        if (status === 404) {
+          notifications.show({
+            title: 'Не найдено',
+            message: 'Сканирование не найдено',
+            color: 'red',
+          });
+        } else if (status >= 500) {
           pollingTimeoutRef.current = setTimeout(() => checkStatus(id), POLLING_ERROR_INTERVAL);
         }
       }
@@ -629,6 +646,26 @@ export default function ScanPage() {
           {/* Результаты сканирования */}
           {result && (
             <Stack gap="xl">
+              {scanError && (
+                <Paper p="lg" radius="md" withBorder bg="var(--mantine-color-orange-0)">
+                  <Group gap="md">
+                    <IconAlertTriangle size={24} color="var(--mantine-color-orange-6)" />
+                    <Stack gap="xs" style={{ flex: 1 }}>
+                      <Text fw={600}>Предупреждение</Text>
+                      <Text size="sm" c="dimmed">{scanError}</Text>
+                    </Stack>
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      color="orange"
+                      onClick={() => checkStatus(searchParams.get('id') || '')}
+                    >
+                      Повторить
+                    </Button>
+                  </Group>
+                </Paper>
+              )}
+
               <Group justify="space-between" align="end">
                 <Stack gap={0}>
                   <Title order={3} size={24}>Результаты сканирования</Title>
@@ -666,21 +703,25 @@ export default function ScanPage() {
                   label="Страниц проверено"
                   value={result.summary.total_pages || 0}
                   icon={<IconCheck size={24} color="teal" />}
+                  loading={loading}
                 />
                 <CardStat
                   label="С нарушениями"
                   value={result.summary.pages_with_violations || 0}
                   icon={<IconAlertTriangle size={24} color="orange" />}
+                  loading={loading}
                 />
                 <CardStat
                   label="Всего нарушений"
                   value={result.summary.total_violations || 0}
                   icon={<IconAlertTriangle size={24} color="red" />}
+                  loading={loading}
                 />
                 <CardStat
                   label="Исключено брендов"
                   value={excludedBrandsCount}
                   icon={<IconBookmark size={24} color="green" />}
+                  loading={loading}
                 />
               </SimpleGrid>
 

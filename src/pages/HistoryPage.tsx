@@ -170,10 +170,13 @@ export default function HistoryPage() {
 
         <Paper radius="lg" withBorder p="lg">
           {loading && scans.length === 0 ? (
-            <Stack p="xl">
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} height={60} radius="md" mb="sm" />
-              ))}
+            <Stack p="xl" gap="md">
+              <Skeleton height={20} radius="md" />
+              <Skeleton height={60} radius="md" />
+              <Skeleton height={60} radius="md" />
+              <Skeleton height={60} radius="md" />
+              <Skeleton height={60} radius="md" />
+              <Skeleton height={20} radius="md" />
             </Stack>
           ) : scans.length === 0 ? (
             <Center p={100}>
