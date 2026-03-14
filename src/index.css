@@ -1,6 +1,6 @@
 :root {
   --mantine-font-family: "Inter", system-ui, sans-serif;
-  /* FIX #4: Улучшенный контраст для dimmed текста (gray.7 вместо gray.6) */
+  /* Улучшенный контраст для dimmed текста */
   --mantine-color-dimmed: #5c5f66;
 }
 
@@ -8,10 +8,32 @@ body {
   background-color: var(--mantine-color-body);
   color: var(--mantine-color-text);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   margin: 0;
+  line-height: 1.5;
 }
 
-/* FIX #8: Уважать prefers-reduced-motion */
+/* Улучшенная читаемость ссылок */
+a {
+  color: var(--mantine-color-blue-6);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+a:hover {
+  color: var(--mantine-color-blue-7);
+}
+
+/* Улучшенная читаемость в темной теме */
+[data-mantine-color-scheme="dark"] a {
+  color: var(--mantine-color-blue-4);
+}
+
+[data-mantine-color-scheme="dark"] a:hover {
+  color: var(--mantine-color-blue-3);
+}
+
+/* FIX: Уважать prefers-reduced-motion */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
@@ -21,13 +43,45 @@ body {
   }
 }
 
+/* Плавная прокрутка */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Улучшенный градиентный текст */
 .gradient-text {
   background: linear-gradient(
     45deg,
-    /* FIX: Улучшенный контраст градиента */
     #1864ab,
     #228be6
   );
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 700;
+}
+
+/* Улучшенные скроллбары */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--mantine-color-default-hover);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--mantine-color-gray-6);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--mantine-color-gray-7);
+}
+
+/* Фокус для доступности */
+*:focus-visible {
+  outline: 2px solid var(--mantine-color-blue-6);
+  outline-offset: 2px;
 }

@@ -14,42 +14,49 @@ const customBlue: MantineColorsTuple = [
   '#2d4b81'
 ];
 
+// Улучшенная темная палитра для лучшей читаемости
+const improvedDark: MantineColorsTuple = [
+  '#d9d9d9', // 0: light gray
+  '#b8b8b8', // 1: gray
+  '#9b9b9b', // 2: medium gray
+  '#7a7a7a', // 3: charcoal gray
+  '#5c5c5c', // 4: dark charcoal
+  '#4a4a4a', // 5: dark gray
+  '#3a3a3a', // 6: darker gray
+  '#2a2a2a', // 7: near black
+  '#1f1f1f', // 8: deep black
+  '#141414', // 9: pure black
+];
+
 export const theme: MantineThemeOverride = createTheme({
   primaryColor: 'blue',
   colors: {
     blue: customBlue,
-    // Кастомная глубокая темная палитра для премиального вида
-    dark: [
-      '#C1C2C5', // 0: silver
-      '#A6A7AB', // 1: stone
-      '#909296', // 2: gray
-      '#5C5F66', // 3: charcoal
-      '#373A40', // 4: soot
-      '#2C2E33', // 5: lead
-      '#25262B', // 6: obsidian
-      '#1A1B1E', // 7: midnight
-      '#141517', // 8: deep black
-      '#101113', // 9: void
-    ],
+    dark: improvedDark,
   },
-  // Улучшенная настройка теней и оттенков
+  // Оптимальные тени для обеих тем
   primaryShade: { light: 7, dark: 4 },
-  defaultRadius: 'lg', // Более мягкие углы для премиальности
+  defaultRadius: 'lg',
   fontFamily: 'Inter, system-ui, sans-serif',
   headings: {
     fontFamily: 'Outfit, sans-serif',
     fontWeight: '700',
   },
   shadows: {
-    md: '0 4px 12px rgba(0, 0, 0, 0.05)',
-    lg: '0 8px 24px rgba(0, 0, 0, 0.08)',
-    xl: '0 16px 48px rgba(0, 0, 0, 0.12)',
+    md: '0 4px 12px rgba(0, 0, 0, 0.08)',
+    lg: '0 8px 24px rgba(0, 0, 0, 0.12)',
+    xl: '0 16px 48px rgba(0, 0, 0, 0.16)',
   },
   components: {
     Button: {
       defaultProps: {
         radius: 'md',
         fw: 600,
+      },
+      styles: {
+        root: {
+          transition: 'all 0.15s ease',
+        },
       },
     },
     Card: {
@@ -61,9 +68,9 @@ export const theme: MantineThemeOverride = createTheme({
       styles: {
         root: {
           backgroundColor: 'var(--mantine-color-body)',
-          transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+          transition: 'transform 0.15s ease, box-shadow 0.15s ease',
           '&:hover': {
-            transform: 'translateY(-4px)',
+            transform: 'translateY(-2px)',
             boxShadow: 'var(--mantine-shadow-md)',
           },
         },
@@ -77,6 +84,21 @@ export const theme: MantineThemeOverride = createTheme({
       styles: {
         root: {
           backgroundColor: 'var(--mantine-color-body)',
+        },
+      },
+    },
+    Table: {
+      defaultProps: {
+        highlightOnHover: true,
+        verticalSpacing: 'md',
+      },
+      styles: {
+        thead: {
+          backgroundColor: 'var(--mantine-color-default-hover)',
+          fontWeight: 700,
+        },
+        row: {
+          transition: 'background-color 0.1s ease',
         },
       },
     },
