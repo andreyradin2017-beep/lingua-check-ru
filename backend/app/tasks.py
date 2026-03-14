@@ -1,13 +1,13 @@
 import asyncio
 import logging
-from celery import shared_task
+from app.celery_app import celery_app
 from app.supabase_client import get_async_supabase
 from app.services.scan_service import _run_scan
 from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
-@shared_task(bind=True, name="app.tasks.run_scan_task")
+@celery_app.task(bind=True, name="app.tasks.run_scan_task")
 def run_scan_task(self, scan_id: str, url: str, max_depth: int, max_pages: int):
     """
     Фоновая задача для запуска сканирования.
@@ -46,7 +46,10 @@ def run_scan_task(self, scan_id: str, url: str, max_depth: int, max_pages: int):
             # В Eager моде мы можем захотеть подождать
             future = asyncio.run_coroutine_threadsafe(run_async_scan(), loop)
             if self.app.conf.task_always_eager:
-                future.result() # Ждем завершения в eager моде
+                try:
+                    future.result(timeout=60) # Ждем завершения в eager моде
+                except Exception as e:
+                    print(f"DEBUG: Future result timeout or error: {e}")
         else:
             print(f"DEBUG: Loop is not running, running until complete for {scan_id}")
             loop.run_until_complete(run_async_scan())

@@ -607,7 +607,10 @@ export default function ScanPage() {
                     max={5}
                     size="md"
                     value={depth}
-                    onChange={(val) => setDepth(val)}
+                    onChange={(val) => {
+                      setDepth(val);
+                      if (val === 0) setMaxPages(1);
+                    }}
                     aria-describedby="depth-description"
                     h="100%"
                   />

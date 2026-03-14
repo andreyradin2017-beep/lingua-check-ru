@@ -181,6 +181,8 @@ async def _scrape_site(scan_id: str, start_url: str, max_depth: int, max_pages: 
             # Но при этом ограничиваем общее количество
             for url in sitemap_urls[:max_pages]:
                 queue.append((url, 0))
+    else:
+        logger.info(f"Scan {scan_id}: depth 0, skipping sitemap and link extraction")
     
     # Если ситмап пуст или его нет, или глубина 0 - используем только старт
     if not queue:
