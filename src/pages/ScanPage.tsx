@@ -175,24 +175,30 @@ const ViolationRow = React.memo(({
 
   return (
     <Table.Tr>
-      <Table.Td>
-        <Text fw={700}>{violation.word || 'N/A'}</Text>
+      <Table.Td style={{ maxWidth: 250, wordBreak: 'break-word' }}>
+        <Text fw={700} style={{ wordBreak: 'break-word' }}>{violation.word || 'N/A'}</Text>
       </Table.Td>
-      <Table.Td>
-        <Badge 
-          color={getTypeColor(violation.type)} 
-          variant="light" 
+      <Table.Td style={{ maxWidth: 220 }}>
+        <Badge
+          color={getTypeColor(violation.type)}
+          variant="light"
           radius="sm"
           role="status"
+          style={{ whiteSpace: 'normal', lineHeight: 1.3 }}
         >
           {translateType(violation.type)}
         </Badge>
       </Table.Td>
-      <Table.Td>
-        <Text 
-          size="xs" 
-          c="blue" 
-          style={{ cursor: 'pointer' }} 
+      <Table.Td style={{ maxWidth: 400, wordBreak: 'break-word' }}>
+        <Text
+          size="xs"
+          c="blue"
+          style={{
+            cursor: 'pointer',
+            wordBreak: 'break-all',
+            whiteSpace: 'normal',
+            lineHeight: 1.4
+          }}
           onClick={handleUrlClick}
           onKeyDown={handleKeyDown}
           tabIndex={0}
@@ -205,8 +211,8 @@ const ViolationRow = React.memo(({
       <Table.Td>
         <Group gap="xs" justify="flex-end">
           <Tooltip label="Добавить в бренды" withArrow>
-            <ActionIcon 
-              variant="subtle" 
+            <ActionIcon
+              variant="subtle"
               onClick={() => onAddTrademark(violation.word || violation.normal_form || '')}
               aria-label={`Добавить "${violation.word}" в бренды`}
             >
@@ -651,25 +657,25 @@ export default function ScanPage() {
 
               {/* Карточки статистики */}
               <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="lg">
-                <CardStat 
-                  label="Страниц проверено" 
-                  value={result.summary.total_pages || 0} 
-                  icon={<IconCheck size={24} color="var(--mantine-color-teal-filled)" />} 
+                <CardStat
+                  label="Страниц проверено"
+                  value={result.summary.total_pages || 0}
+                  icon={<IconCheck size={24} color="teal" />}
                 />
-                <CardStat 
-                  label="С нарушениями" 
-                  value={result.summary.pages_with_violations || 0} 
-                  icon={<IconAlertTriangle size={24} color="var(--mantine-color-orange-filled)" />} 
+                <CardStat
+                  label="С нарушениями"
+                  value={result.summary.pages_with_violations || 0}
+                  icon={<IconAlertTriangle size={24} color="orange" />}
                 />
-                <CardStat 
-                  label="Всего нарушений" 
-                  value={result.summary.total_violations || 0} 
-                  icon={<IconAlertTriangle size={24} color="var(--mantine-color-red-filled)" />} 
+                <CardStat
+                  label="Всего нарушений"
+                  value={result.summary.total_violations || 0}
+                  icon={<IconAlertTriangle size={24} color="red" />}
                 />
-                <CardStat 
-                  label="Исключено брендов" 
-                  value={excludedBrandsCount} 
-                  icon={<IconBookmark size={24} color="var(--mantine-color-green-filled)" />} 
+                <CardStat
+                  label="Исключено брендов"
+                  value={excludedBrandsCount}
+                  icon={<IconBookmark size={24} color="green" />}
                 />
               </SimpleGrid>
 
@@ -736,14 +742,27 @@ export default function ScanPage() {
                       <Text c="dimmed">Нарушений не найдено по вашему фильтру</Text>
                     </Center>
                   ) : (
-                    <Box style={{ overflowX: 'auto' }} role="region" aria-label="Таблица нарушений">
-                      <Table highlightOnHover verticalSpacing="md" stickyHeader>
+                    <Box
+                      style={{
+                        overflowX: 'auto',
+                        maxWidth: '100%',
+                        border: '1px solid var(--mantine-color-default-border)',
+                        borderRadius: 'var(--mantine-radius-md)'
+                      }}
+                      role="region"
+                      aria-label="Таблица нарушений"
+                    >
+                      <Table
+                        highlightOnHover
+                        verticalSpacing="md"
+                        stickyHeader
+                      >
                         <Table.Thead>
                           <Table.Tr>
-                            <Table.Th>Слово</Table.Th>
-                            <Table.Th>Тип нарушения</Table.Th>
-                            <Table.Th>Страница</Table.Th>
-                            <Table.Th style={{ width: 100 }} ta="right">Действия</Table.Th>
+                            <Table.Th style={{ minWidth: 150, maxWidth: 250 }}>Слово</Table.Th>
+                            <Table.Th style={{ minWidth: 180, maxWidth: 220 }}>Тип нарушения</Table.Th>
+                            <Table.Th style={{ minWidth: 300 }}>Страница</Table.Th>
+                            <Table.Th style={{ width: 120, minWidth: 120 }} ta="right">Действия</Table.Th>
                           </Table.Tr>
                         </Table.Thead>
                         <Table.Tbody>

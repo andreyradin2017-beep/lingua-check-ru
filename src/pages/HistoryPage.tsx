@@ -154,12 +154,12 @@ export default function HistoryPage() {
         </Group>
 
         {error && (
-          <Paper p="xl" withBorder radius="md" bg="red.0">
+          <Paper p="xl" withBorder radius="md" variant="light" color="red">
             <Group gap="md">
-              <IconAlertTriangle size={24} color="var(--mantine-color-red-6)" />
+              <IconAlertTriangle size={24} />
               <Stack gap="xs" style={{ flex: 1 }}>
-                <Text fw={600} c="red.9">Ошибка загрузки данных</Text>
-                <Text size="sm" c="red.7">{error}</Text>
+                <Text fw={600}>Ошибка загрузки данных</Text>
+                <Text size="sm" c="dimmed">{error}</Text>
                 <Button size="xs" variant="outline" color="red" onClick={() => fetchHistory()} mt="xs">
                   Попробовать снова
                 </Button>
@@ -168,7 +168,7 @@ export default function HistoryPage() {
           </Paper>
         )}
 
-        <Paper radius="lg">
+        <Paper radius="lg" withBorder p="lg">
           {loading && scans.length === 0 ? (
             <Stack p="xl">
               {[...Array(5)].map((_, i) => (
@@ -178,7 +178,7 @@ export default function HistoryPage() {
           ) : scans.length === 0 ? (
             <Center p={100}>
               <Stack align="center">
-                <IconHistory size={80} color="var(--mantine-color-gray-4)" />
+                <IconHistory size={80} style={{ color: 'var(--mantine-color-dimmed)' }} />
                 <Text c="dimmed" size="lg">История пока пуста</Text>
                 <Button variant="light" onClick={() => navigate('/scans')}>Запустить первую проверку</Button>
               </Stack>
