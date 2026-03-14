@@ -585,7 +585,7 @@ export default function ScanPage() {
           <Paper p="xl" radius="lg" role="form" aria-label="Форма сканирования сайта">
             <Stack gap="xl">
               <Grid gutter="lg" align="stretch">
-                <Grid.Col span={{ base: 12, md: 8 }}>
+                <Grid.Col span={{ base: 12, md: 9 }}>
                   <TextInput
                     label="URL сайта"
                     placeholder="https://example.com"
@@ -599,7 +599,7 @@ export default function ScanPage() {
                     h="100%"
                   />
                 </Grid.Col>
-                <Grid.Col span={{ base: 12, sm: 6, md: 2 }}>
+                <Grid.Col span={{ base: 12, sm: 6, md: 1.5 }}>
                   <NumberInput
                     label="Глубина"
                     description="От 0 до 5 уровней"
@@ -612,7 +612,7 @@ export default function ScanPage() {
                     h="100%"
                   />
                 </Grid.Col>
-                <Grid.Col span={{ base: 12, sm: 6, md: 2 }}>
+                <Grid.Col span={{ base: 12, sm: 6, md: 1.5 }}>
                   <NumberInput
                     label="Лимит страниц"
                     description="Макс. 1000"
