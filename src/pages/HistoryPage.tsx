@@ -211,9 +211,24 @@ export default function HistoryPage() {
                           </Group>
                         </Table.Td>
                         <Table.Td>
-                          <Badge color={getScanStatusColor(scan.status)} variant="light">
-                            {translateScanStatus(scan.status)}
-                          </Badge>
+                          <Tooltip
+                            label={
+                              scan.status === 'started' ? 'Сканирование создано и ожидает обработки' :
+                              scan.status === 'in_progress' ? 'Идет активное сканирование страниц' :
+                              scan.status === 'completed' ? 'Сканирование завершено успешно' :
+                              scan.status === 'failed' ? 'Произошла ошибка при сканировании' :
+                              'Сканирование было остановлено пользователем'
+                            }
+                            withArrow
+                          >
+                            <Badge
+                              color={getScanStatusColor(scan.status)}
+                              variant="light"
+                              style={{ cursor: 'help' }}
+                            >
+                              {translateScanStatus(scan.status)}
+                            </Badge>
+                          </Tooltip>
                         </Table.Td>
                         <Table.Td>
                           <Group gap="xs" justify="flex-end">
