@@ -17,10 +17,10 @@ Object.defineProperty(window, 'matchMedia', {
 });
 
 // Mock window.scrollTo
-window.scrollTo = vi.fn();
+window.scrollTo = vi.fn() as any;
 
 // Mock window.resizeTo
-window.resizeTo = vi.fn();
+window.resizeTo = vi.fn() as any;
 
 // Mock axios
 vi.mock('axios', () => ({
