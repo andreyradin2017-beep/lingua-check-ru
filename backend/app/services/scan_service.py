@@ -5,6 +5,7 @@ scan_service.py — Phase 4
 """
 import asyncio
 import hashlib
+import json
 import logging
 import sys
 import threading
