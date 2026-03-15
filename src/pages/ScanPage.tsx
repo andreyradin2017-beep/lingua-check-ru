@@ -64,7 +64,6 @@ interface ScanResult {
   id: string;
 }
 
-const INTERNAL_STATE_URL = "__internal_crawler_state__";
 
 interface GlobalException {
   id: string;
