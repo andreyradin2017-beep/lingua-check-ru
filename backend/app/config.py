@@ -14,20 +14,21 @@ class Settings(BaseSettings):
 
     # Playwright настройки (FIX #11: вынесено в конфиг)
     playwright_timeout_ms: int = 60000
-    playwright_wait_until: str = "domcontentloaded"
+    playwright_wait_until: str = "domcontentloaded"  # Более быстрый для Render
     playwright_headless: bool = True
 
     supabase_url: str = ""
     supabase_key: str = ""
     redis_url: str = "redis://localhost:6379/0"
-    celery_task_always_eager: bool = True
+    celery_task_always_eager: bool = False  # Отключено для асинхронности на Render
 
     # CORS
     cors_origins: list[str] = [
         "http://localhost:5173",
         "http://localhost:3000",
         "http://127.0.0.1:5173",
-        "http://127.0.0.1:3000"
+        "http://127.0.0.1:3000",
+        "https://russian-lang-cyan.vercel.app"
     ]
 
 

@@ -20,6 +20,11 @@ from app.supabase_client import get_async_supabase
 from app.services.token_service import analyze_text
 from app.config import settings
 
+try:
+    from playwright.async_api import async_playwright
+except ImportError:
+    async_playwright = None
+
 logger = logging.getLogger(__name__)
 
 # Установка политики для Windows (исправление NotImplementedError)
@@ -243,9 +248,7 @@ def _is_excluded_url(url: str) -> bool:
     return False
 
 async def _scrape_site(scan_id: str, start_url: str, max_depth: int, max_pages: int, client: any, is_resume: bool = False) -> None:
-    try:
-        from playwright.async_api import async_playwright
-    except ImportError:
+    if async_playwright is None:
         logger.error("Playwright не установлен.")
         return
 
@@ -341,7 +344,7 @@ async def _scrape_site(scan_id: str, start_url: str, max_depth: int, max_pages: 
                     if not response or response.status >= 400:
                         page_status = "blocked"
                     else:
-                        await asyncio.sleep(0.5) # Немного подождем динамику
+                        await asyncio.sleep(1.0) # Увеличено для рендеринга SPA
                         content_text = await page.evaluate("""() => {
                             const selectors = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'span', 'div', 'li', 'td', 'th', 'a', 'label', 'button'];
                             let text = '';
@@ -360,8 +363,24 @@ async def _scrape_site(scan_id: str, start_url: str, max_depth: int, max_pages: 
                             content_text = await page.inner_text("body")
                         
                         if depth < max_depth:
-                            links = await page.evaluate("() => Array.from(document.querySelectorAll('a[href]')).map(a => a.href).filter(h => h.startsWith('http'))")
-                            for link in set(links):
+                            # Улучшенный сбор ссылок: href + data-href
+                            links = await page.evaluate("""() => {
+                                const results = [];
+                                document.querySelectorAll('a[href], [data-href]').forEach(el => {
+                                    const href = el.getAttribute('href') || el.getAttribute('data-href');
+                                    if (href && !href.startsWith('javascript:')) {
+                                        try {
+                                            const url = new URL(href, window.location.href).href;
+                                            if (url.startsWith('http')) results.push(url);
+                                        } catch(e) {}
+                                    }
+                                });
+                                return Array.from(new Set(results));
+                            }""")
+                            
+                            logger.info("Scan %s: found %d raw links on %s", scan_id, len(links), current_url)
+                            
+                            for link in links:
                                 link = link.split('#')[0].rstrip('/')
                                 if link not in visited and urlparse(link).netloc == base_domain:
                                     if not _is_excluded_url(link):

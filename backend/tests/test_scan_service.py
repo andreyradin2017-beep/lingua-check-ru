@@ -117,12 +117,15 @@ class TestStopScan:
         import threading
         
         scan_id = "test-scan-id-3"
-        _ACTIVE_SCANS[scan_id] = threading.Event()
+        _ACTIVE_SCANS[scan_id] = {
+            "stop_event": threading.Event(),
+            "pause_event": threading.Event()
+        }
         
         result = stop_scan(scan_id)
         
         assert result is True
-        assert _ACTIVE_SCANS[scan_id].is_set() is True
+        assert _ACTIVE_SCANS[scan_id]["stop_event"].is_set() is True
         
         # Очищаем
         del _ACTIVE_SCANS[scan_id]
@@ -247,7 +250,43 @@ class TestContentExtraction:
         # Реализовано в JavaScript коде извлечения текста
         pass
 
-    def test_ignore_hidden_elements(self):
+    def test_ignore_hidden_elements(self, client):
         """Скрытые элементы (display: none) должны игнорироваться"""
         # Реализовано в JavaScript коде извлечения текста
+        pass
+
+
+class TestScanRegression:
+    """Регрессионные тесты для исправления критических багов"""
+
+    @pytest.mark.asyncio
+    async def test_run_scan_receives_is_resume(self):
+        """Проверка что _run_scan корректно передает is_resume в _scrape_site"""
+        from app.services.scan_service import _run_scan
+        
+        # Мокаем Supabase клиент
+        mock_supabase = AsyncMock()
+        mock_response = MagicMock()
+        mock_response.data = []
+        
+        # Настраиваем цепочку: table().update().eq().execute()
+        # Каждое звено должно возвращать объект, у которого есть следующий метод
+        mock_builder = MagicMock()
+        mock_supabase.table.return_value = mock_builder
+        mock_builder.update.return_value = mock_builder
+        mock_builder.eq.return_value = mock_builder
+        mock_builder.execute = AsyncMock(return_value=mock_response)
+        
+        with patch('app.services.scan_service.get_async_supabase', AsyncMock(return_value=mock_supabase)):
+            with patch('app.services.scan_service._scrape_site', new_callable=AsyncMock) as mock_scrape:
+                await _run_scan("test-id", "https://test.com", 1, 5, is_resume=True)
+                
+                # Проверяем что _scrape_site был вызван
+                assert mock_scrape.called, "_scrape_site should be called"
+                _, kwargs = mock_scrape.call_args
+                assert kwargs.get('is_resume') is True
+
+    def test_link_extraction_with_data_href(self):
+        """Тест логики извлечения ссылок (JS часть проверяется в интеграции)"""
+        # Этот тест напоминает нам, что мы поддерживаем data-href
         pass
