@@ -62,6 +62,7 @@ interface ScanResult {
   };
   pages: Page[];
   violations: Violation[];
+  id: string;
 }
 
 export interface GroupedViolation {
@@ -289,6 +290,7 @@ export default function ScanPage() {
   useEffect(() => {
     const scanId = searchParams.get('id');
     if (scanId) {
+      setLoading(true);
       checkStatus(scanId);
     } else {
       setResult(null);
@@ -311,6 +313,7 @@ export default function ScanPage() {
       setScanError(null);
       const res = await apiClient.get(`${API_URL}/api/v1/scan/${id}`);
       setResult(res.data);
+      setLoading(false);
 
       if (res.data.summary && res.data.summary.total_violations > 0) {
         try {
@@ -334,6 +337,7 @@ export default function ScanPage() {
         : 'Произошла неизвестная ошибка';
 
       setScanError(msg);
+      setLoading(false);
 
       // Retry logic с экспоненциальной задержкой
       if (retryCount < 3) {
@@ -436,6 +440,26 @@ export default function ScanPage() {
       setLoading(false);
     }
   }, [url, depth, maxPages, checkStatus]);
+
+  // Остановка сканирования
+  const handleStopScan = useCallback(async () => {
+    if (!result?.id && !searchParams.get('id')) return;
+    const scanId = result?.id || searchParams.get('id');
+    
+    try {
+      await apiClient.post(`${API_URL}/api/v1/scan/${scanId}/stop`);
+      notifications.show({ 
+        title: 'Запрос на остановку', 
+        message: 'Сигнал остановки отправлен краулеру...', 
+        color: 'orange' 
+      });
+      // Сразу проверяем статус еще раз
+      if (scanId) checkStatus(scanId);
+    } catch (err: unknown) {
+      const msg = axios.isAxiosError(err) ? err.response?.data?.detail || err.message : String(err);
+      notifications.show({ title: 'Ошибка остановки', message: msg, color: 'red' });
+    }
+  }, [result?.id, searchParams, checkStatus]);
 
   // Фильтрация нарушений
   const filteredViolations = useMemo(() => {
@@ -689,7 +713,7 @@ export default function ScanPage() {
                 <Stack gap={0}>
                   <Title order={3} size={24}>Результаты сканирования</Title>
                   <Text c="dimmed" size="sm">
-                    Анализ завершен. Обнаружено {result.summary.total_violations} конфликтов.
+                    {result.status === 'completed' ? 'Анализ завершен.' : 'Анализ в процессе...'} Обнаружено {result.summary.total_violations} конфликтов.
                   </Text>
                 </Stack>
                 <Group>
@@ -755,7 +779,18 @@ export default function ScanPage() {
                           Обработано {result.summary.total_pages} из {maxPages} ({progressValue.toFixed(0)}%)
                         </Text>
                       </Stack>
-                      <Badge size="lg" variant="dot" color="blue">В ПРОЦЕССЕ</Badge>
+                      <Group gap="xs">
+                        <Button 
+                          variant="light" 
+                          color="red" 
+                          size="xs" 
+                          onClick={handleStopScan}
+                          leftSection={<IconAlertTriangle size={14} />}
+                        >
+                          Остановить
+                        </Button>
+                        <Badge size="lg" variant="dot" color="blue">В ПРОЦЕССЕ</Badge>
+                      </Group>
                     </Group>
                     <Progress
                       value={progressValue}

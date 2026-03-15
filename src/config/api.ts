@@ -8,7 +8,7 @@ export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 /**
  * Таймаут запросов в миллисекундах
  */
-export const API_TIMEOUT = 30000;
+export const API_TIMEOUT = 60000;
 
 /**
  * Интервал опроса статуса сканирования (мс)
