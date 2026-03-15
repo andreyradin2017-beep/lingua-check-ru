@@ -773,7 +773,7 @@ export default function ScanPage() {
               <Paper p="md" radius="lg">
                 <Stack gap="md">
                   <Grid align="flex-end" gutter="md">
-                    <Grid.Col span={{ base: 12, sm: 'auto' }}>
+                    <Grid.Col span={{ base: 12, sm: 8 }}>
                       <TextInput
                         placeholder="Поиск по слову, контексту или URL..."
                         size="md"
@@ -783,21 +783,29 @@ export default function ScanPage() {
                         aria-label="Поиск нарушений"
                       />
                     </Grid.Col>
-                    <Grid.Col span={{ base: 12, sm: 250 }}>
-                      <MultiSelect
-                        placeholder="Все типы"
-                        size="md"
-                        data={[
-                          { value: 'foreign_word', label: 'Иностранная лексика' },
-                          { value: 'unrecognized_word', label: 'Опечатки' },
-                          { value: 'no_russian_dub', label: 'Без перевода' },
-                          { value: 'trademark', label: 'Товарные знаки' },
-                          { value: 'possible_trademark', label: 'Потенциальный бренд' },
-                        ]}
-                        value={typeFilter}
-                        onChange={handleTypeFilterChange}
-                        clearable
-                        aria-label="Фильтр по типу нарушений"
+                    <Grid.Col span={{ base: 12, sm: 4 }}>
+                      <Box style={{ width: '100%' }}>
+                        <MultiSelect
+                          placeholder="Все типы"
+                          size="md"
+                          data={[
+                            { value: 'foreign_word', label: 'Иностранная лексика' },
+                            { value: 'unrecognized_word', label: 'Опечатки' },
+                            { value: 'no_russian_dub', label: 'Без перевода' },
+                            { value: 'trademark', label: 'Товарные знаки' },
+                            { value: 'possible_trademark', label: 'Потенциальный бренд' },
+                          ]}
+                          value={typeFilter}
+                          onChange={handleTypeFilterChange}
+                          clearable
+                          aria-label="Фильтр по типу нарушений"
+                          styles={{
+                            input: { overflow: 'hidden' },
+                            pill: { maxWidth: '100%' }
+                          }}
+                        />
+                      </Box>
+                    </Grid.Col>
                       />
                     </Grid.Col>
                   </Grid>
