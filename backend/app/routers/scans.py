@@ -2,7 +2,7 @@ import logging
 import uuid
 import asyncio
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,7 +19,7 @@ from app.schemas import (
     ScanHistoryItem,
 )
 from app.services.scan_service import start_scan_background, stop_scan
-from app.tasks import run_scan_task
+from app.tasks import run_scan_background_task
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -28,10 +28,7 @@ limiter = Limiter(key_func=get_remote_address)
 
 @router.post("/scan", response_model=ScanStartResponse, status_code=202)
 # @limiter.limit("5/minute")  # Максимум 5 сканирований в минуту
-async def create_scan(
-    request: Request,
-    body: ScanStartRequest,
-) -> ScanStartResponse:
+async def create_scan(request: Request, body: ScanStartRequest, background_tasks: BackgroundTasks) -> ScanStartResponse:
     """
     specs/api.md — POST /api/v1/scan
     Запускает сканирование сайта в фоновом режиме.
@@ -55,13 +52,8 @@ async def create_scan(
 
     logger.info("Scan %s created for URL %s", scan_id, body.url)
 
-    # Запуск в фоне через Celery
-    run_scan_task.delay(
-        scan_id, 
-        body.url, 
-        body.max_depth, 
-        body.max_pages
-    )
+    # Запуск в фоне через FastAPI BackgroundTasks
+    background_tasks.add_task(run_scan_background_task, scan_id, body.url, body.max_depth, body.max_pages)
 
     return ScanStartResponse(scan_id=scan_id, status="started")
 
@@ -117,7 +109,7 @@ async def pause_scan_endpoint(scan_id: str):
 
 
 @router.post("/scan/{scan_id}/resume")
-async def resume_scan_endpoint(scan_id: str):
+async def resume_scan_endpoint(scan_id: str, background_tasks: BackgroundTasks):
     """
     Возобновляет ранее приостановленное сканирование.
     """
@@ -133,14 +125,8 @@ async def resume_scan_endpoint(scan_id: str):
     # Обновляем статус обратно на started/in_progress
     await client.table("scans").update({"status": "started"}).eq("id", scan_id).execute()
     
-    # Запуск в фоне через Celery с флагом resume
-    run_scan_task.delay(
-        scan_id, 
-        scan["target_url"], 
-        scan["max_depth"], 
-        scan["max_pages"],
-        is_resume=True
-    )
+    # Запуск в фоне через FastAPI BackgroundTasks
+    background_tasks.add_task(run_scan_background_task, scan_id, scan["target_url"], scan["max_depth"], scan["max_pages"], is_resume=True)
     
     return {"status": "resuming", "scan_id": scan_id}
 

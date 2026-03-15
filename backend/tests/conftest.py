@@ -56,8 +56,7 @@ patch("celery.Celery", return_value=mock_celery).start()
 
 # Мокируем задачи
 mock_task = MagicMock()
-mock_task.delay.return_value = MagicMock(id="test-task-id")
-patch("app.routers.scans.run_scan_task", mock_task).start()
+patch("app.routers.scans.run_scan_background_task", mock_task).start()
 
 # Мокируем redis_service
 mock_redis = AsyncMock()

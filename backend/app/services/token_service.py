@@ -47,7 +47,7 @@ _STATIC_EXCEPTIONS = {
     # Прочие технические
     "jpg", "jpeg", "png", "gif", "svg", "webp", "mp4", "webm", "pdf",
     "ajax", "json", "xml", "api", "cdn", "ssl", "tls", "dns",
-    "get", "post", "put", "delete", "patch", "head", "options"
+    "get", "post", "put", "delete", "patch", "head", "options", "drug"
 }
 
 _ROMAN_RE = re.compile(r"^[IVXLCDM]+$", re.IGNORECASE)

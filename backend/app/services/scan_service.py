@@ -312,7 +312,7 @@ async def _scrape_site(scan_id: str, start_url: str, max_depth: int, max_pages: 
         except Exception as e:
             logger.error("Scan %s: failed to launch browser: %s", scan_id, e)
             raise
-        semaphore = asyncio.Semaphore(5)
+        semaphore = asyncio.Semaphore(2)
         
         async def process_page(current_url, depth):
             nonlocal pages_count
@@ -322,6 +322,7 @@ async def _scrape_site(scan_id: str, start_url: str, max_depth: int, max_pages: 
                 return
 
             async with semaphore:
+                logger.info(f"Scan {scan_id}: processing page {current_url}")
                 if current_url in visited:
                     # Мы уже добавили в visited в основном цикле, 
                     # но тут можем проверить еще раз для надежности 
@@ -348,12 +349,24 @@ async def _scrape_site(scan_id: str, start_url: str, max_depth: int, max_pages: 
                         content_text = await page.evaluate("""() => {
                             const selectors = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'span', 'div', 'li', 'td', 'th', 'a', 'label', 'button'];
                             let text = '';
+                            
+                            const isVisible = (el) => {
+                                if (!el || el.nodeType !== 1) return true;
+                                if (el.getAttribute('aria-hidden') === 'true') return false;
+                                const style = window.getComputedStyle(el);
+                                if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+                                return isVisible(el.parentElement);
+                            };
+
                             selectors.forEach(sel => {
                                 document.querySelectorAll(sel).forEach(el => {
-                                    if (el.closest('script, style, noscript, template')) return;
-                                    const style = window.getComputedStyle(el);
-                                    if (style.display === 'none' || style.visibility === 'hidden') return;
-                                    text += ' ' + el.innerText;
+                                    if (el.closest('script, style, noscript, template, [aria-hidden="true"]')) return;
+                                    if (!isVisible(el)) return;
+                                    
+                                    const nodeText = el.innerText.trim();
+                                    if (nodeText && !text.includes(nodeText)) {
+                                        text += ' ' + nodeText;
+                                    }
                                 });
                             });
                             return text;

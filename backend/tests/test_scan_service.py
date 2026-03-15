@@ -263,24 +263,24 @@ class TestScanRegression:
     async def test_run_scan_receives_is_resume(self):
         """Проверка что _run_scan корректно передает is_resume в _scrape_site"""
         from app.services.scan_service import _run_scan
-        
-        # Мокаем Supabase клиент
-        mock_supabase = AsyncMock()
+    
+        # Мокаем Supabase клиент более надежно
         mock_response = MagicMock()
         mock_response.data = []
-        
-        # Настраиваем цепочку: table().update().eq().execute()
-        # Каждое звено должно возвращать объект, у которого есть следующий метод
+    
         mock_builder = MagicMock()
-        mock_supabase.table.return_value = mock_builder
+        mock_execute = AsyncMock(return_value=mock_response)
         mock_builder.update.return_value = mock_builder
         mock_builder.eq.return_value = mock_builder
-        mock_builder.execute = AsyncMock(return_value=mock_response)
-        
+        mock_builder.execute = mock_execute
+    
+        mock_supabase = MagicMock()
+        mock_supabase.table.return_value = mock_builder
+    
         with patch('app.services.scan_service.get_async_supabase', AsyncMock(return_value=mock_supabase)):
             with patch('app.services.scan_service._scrape_site', new_callable=AsyncMock) as mock_scrape:
                 await _run_scan("test-id", "https://test.com", 1, 5, is_resume=True)
-                
+    
                 # Проверяем что _scrape_site был вызван
                 assert mock_scrape.called, "_scrape_site should be called"
                 _, kwargs = mock_scrape.call_args

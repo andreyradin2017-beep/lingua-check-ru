@@ -1,7 +1,7 @@
 # 📚 Документация LinguaCheck-RU
 
-**Версия:** 1.11.0  
-**Дата:** 14 марта 2026
+**Версия:** 1.13.0  
+**Дата:** 15 марта 2026
 
 ---
 
@@ -52,23 +52,12 @@ python run.py
 ```
 russian-lang/
 ├── src/                      # Frontend (React + TypeScript)
-│   ├── pages/                # Страницы приложения
-│   ├── components/           # Переиспользуемые компоненты
-│   ├── utils/                # Утилиты (validation, sanitize, translations)
-│   ├── test/                 # Frontend тесты (Vitest)
-│   └── config/               # Конфигурация
 ├── backend/                  # Backend (FastAPI + Python)
-│   ├── app/
-│   │   ├── routers/          # API endpoints
-│   │   ├── services/         # Бизнес-логика
-│   │   ├── utils/            # Утилиты
-│   │   └── tests/            # Backend тесты (pytest)
-│   └── tests/
-├── scripts/                  # Скрипты диагностики
-├── docs/                     # Дополнительная документация
-└── specs/                    # Спецификации
+├── docs/                     # База знаний и отчеты
+├── scripts/                  # Скрипты диагностики и мониторинга
+├── SPECIFICATION.md          # Основная техническая спецификация (SOT)
+└── README.md                 # Входная точка проекта
 ```
-
 ---
 
 ## 🧪 Тестирование
@@ -202,4 +191,4 @@ python scripts/full_diagnostic.py
 ---
 
 **Последнее обновление:** 14 марта 2026  
-**Версия:** 1.11.0
+**Версия:** 1.13.0  

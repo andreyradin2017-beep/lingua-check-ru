@@ -56,3 +56,18 @@ def run_scan_task(self, scan_id: str, url: str, max_depth: int, max_pages: int, 
         logger.error(f"Fatal error starting task {scan_id}: {e}")
 
     return {"scan_id": scan_id, "status": "finished"}
+
+def run_scan_background_task(scan_id: str, url: str, max_depth: int, max_pages: int, is_resume: bool = False):
+    """
+    Упрощенная обертка для запуска асинхронного сканирования через FastAPI BackgroundTasks.
+    """
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    if loop.is_running():
+        asyncio.run_coroutine_threadsafe(_run_scan(scan_id, url, max_depth, max_pages, is_resume=is_resume), loop)
+    else:
+        loop.run_until_complete(_run_scan(scan_id, url, max_depth, max_pages, is_resume=is_resume))

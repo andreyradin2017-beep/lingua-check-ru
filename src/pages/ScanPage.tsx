@@ -599,7 +599,7 @@ export default function ScanPage() {
         { wch: 25 },
       ];
 
-      XLSX.writeFile(workbook, `violations_${new Date().toISOString().split('T')[0]}.xlsx`);
+      XLSX.writeFile(workbook, `linguacheck_violations_${new Date().toISOString().slice(0, 10)}.xlsx`);
       notifications.show({ 
         title: 'Экспорт', 
         message: `Файл Excel (${data.length} строк) успешно создан`, 
@@ -635,7 +635,7 @@ export default function ScanPage() {
         styles: { fontSize: 8, cellPadding: 2 },
       });
 
-      doc.save(`violations_${new Date().toISOString().split('T')[0]}.pdf`);
+      doc.save(`linguacheck_violations_${new Date().toISOString().slice(0, 10)}.pdf`);
       notifications.show({
         title: 'Экспорт PDF',
         message: 'Документ успешно сформирован и загружен',
