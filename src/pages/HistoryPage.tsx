@@ -271,7 +271,7 @@ export default function HistoryPage() {
                               </Tooltip>
                             )}
 
-                            {(scan.status === 'paused' || scan.status === 'stopped') && (
+                            {(scan.status === 'paused' || scan.status === 'stopped' || scan.status === 'failed') && (
                               <Tooltip label="Продолжить">
                                 <ActionIcon color="green" variant="light" onClick={() => resumeScan(scan.id, scan.target_url || '')}>
                                   <IconPlayerPlay size={18} />

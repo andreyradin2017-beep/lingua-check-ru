@@ -127,8 +127,8 @@ async def resume_scan_endpoint(scan_id: str):
         raise HTTPException(status_code=404, detail="Скан не найден")
     
     scan = resp.data[0]
-    if scan["status"] not in ["paused", "stopped"]:
-        return {"status": "ignored", "message": "Можно возобновить только сканы в статусе paused или stopped", "current_status": scan["status"]}
+    if scan["status"] not in ["paused", "stopped", "failed"]:
+        return {"status": "ignored", "message": "Можно возобновить только сканы в статусе paused, stopped или failed", "current_status": scan["status"]}
     
     # Обновляем статус обратно на started/in_progress
     await client.table("scans").update({"status": "started"}).eq("id", scan_id).execute()

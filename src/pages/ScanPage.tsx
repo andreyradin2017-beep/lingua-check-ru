@@ -849,7 +849,7 @@ export default function ScanPage() {
               </SimpleGrid>
 
               {/* Индикатор прогресса */}
-              {(['in_progress', 'started', 'pausing', 'paused', 'stopped'].includes(result.status)) && (
+              {(['in_progress', 'started', 'pausing', 'paused', 'stopped', 'failed'].includes(result.status)) && (
                 <Paper p="xl" radius="lg" withBorder role="status" aria-live="polite">
                   <Stack gap="md">
                     <Group justify="space-between">
