@@ -25,7 +25,6 @@ import { notifications } from '@mantine/notifications';
 import axios from 'axios';
 import { Helmet } from 'react-helmet-async';
 import apiClient from '../api/client';
-import { API_URL } from '../config/api';
 import { isValidUrl } from '../utils/validation';
 import { mapTrademarks, filterByType, filterBySearch, type Trademark } from '../utils/trademarkMapper';
 
@@ -63,6 +62,13 @@ interface ScanResult {
   pages: Page[];
   violations: Violation[];
   id: string;
+}
+
+const INTERNAL_STATE_URL = "__internal_crawler_state__";
+
+interface GlobalException {
+  id: string;
+  word: string;
 }
 
 export interface GroupedViolation {
@@ -251,8 +257,9 @@ export default function ScanPage() {
   const [result, setResult] = useState<ScanResult | null>(null);
   const [groupedViolations, setGroupedViolations] = useState<GroupedViolation[]>([]);
   const [trademarks, setTrademarks] = useState<Trademark[]>([]);
+  const [exceptions, setExceptions] = useState<GlobalException[]>([]);
   const [activePage, setPage] = useState(1);
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [scanError, setScanError] = useState<string | null>(null);
 
   // Фильтры с debouncing
@@ -275,16 +282,26 @@ export default function ScanPage() {
   // Загрузка брендов
   const fetchTrademarks = useCallback(async () => {
     try {
-      const res = await apiClient.get(`${API_URL}/api/v1/trademarks`);
+      const res = await apiClient.get('/api/v1/trademarks');
       setTrademarks(res.data);
     } catch (err: unknown) {
       console.error('Failed to fetch trademarks', err);
     }
   }, []);
 
+  const fetchExceptions = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/api/v1/exceptions');
+      setExceptions(res.data);
+    } catch (err) {
+      console.error('Failed to fetch exceptions', err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchTrademarks();
-  }, [fetchTrademarks]);
+    fetchExceptions();
+  }, [fetchTrademarks, fetchExceptions]);
 
   // Обработка изменения searchParams
   useEffect(() => {
@@ -311,13 +328,13 @@ export default function ScanPage() {
   const checkStatus = useCallback(async (id: string, retryCount = 0) => {
     try {
       setScanError(null);
-      const res = await apiClient.get(`${API_URL}/api/v1/scan/${id}`);
+      const res = await apiClient.get(`/api/v1/scan/${id}`);
       setResult(res.data);
       setLoading(false);
 
       if (res.data.summary && res.data.summary.total_violations > 0) {
         try {
-          const groupedRes = await apiClient.get(`${API_URL}/api/v1/scan/${id}/grouped`);
+          const groupedRes = await apiClient.get(`/api/v1/scan/${id}/grouped`);
           setGroupedViolations(Array.isArray(groupedRes.data) ? groupedRes.data : []);
         } catch (err) {
           console.error('Failed to load grouped violations', err);
@@ -371,7 +388,7 @@ export default function ScanPage() {
   const addTrademark = useCallback(async (word: string) => {
     if (!word) return;
     try {
-      await apiClient.post(`${API_URL}/api/v1/trademarks`, { word });
+      await apiClient.post('/api/v1/trademarks', { word });
       notifications.show({ 
         title: 'Бренд добавлен', 
         message: `Слово "${word}" теперь исключено из нарушений`, 
@@ -388,17 +405,18 @@ export default function ScanPage() {
   const addException = useCallback(async (word: string) => {
     if (!word) return;
     try {
-      await apiClient.post(`${API_URL}/api/v1/exceptions`, { word });
+      await apiClient.post('/api/v1/exceptions', { word });
       notifications.show({ 
         title: 'Добавлено в исключения', 
         message: `Слово "${word}" добавлено в глобальные исключения`, 
         color: 'green' 
       });
+      await fetchExceptions();
     } catch (err: unknown) {
       const msg = axios.isAxiosError(err) ? err.response?.data?.detail || err.message : String(err);
       notifications.show({ title: 'Ошибка', message: msg, color: 'red' });
     }
-  }, []);
+  }, [fetchExceptions]);
 
   // Запуск сканирования
   const startScan = useCallback(async () => {
@@ -422,17 +440,19 @@ export default function ScanPage() {
     setPage(1);
     
     try {
-      const res = await apiClient.post(`${API_URL}/api/v1/scan`, {
+      const res = await apiClient.post('/api/v1/scan', {
         url: targetUrl,
         max_depth: Number(depth),
         max_pages: Number(maxPages),
       });
       notifications.show({ 
         title: 'Сканирование запущено', 
-        message: 'Процесс запущен в фоновом режиме. Вы можете следить за статусом здесь или в разделе «История».', 
+        message: 'Процесс запущен. Вы будете перенаправлены к результатам.', 
         color: 'blue' 
       });
-      setTimeout(() => checkStatus(res.data.scan_id), POLLING_INTERVAL);
+      
+      // Просто обновляем URL, useEffect сам подхватит новый ID и запустит polling
+      setSearchParams({ id: res.data.scan_id });
     } catch (err: unknown) {
       const msg = axios.isAxiosError(err) ? err.response?.data?.detail || err.message : String(err);
       notifications.show({ title: 'Ошибка', message: msg, color: 'red' });
@@ -447,7 +467,7 @@ export default function ScanPage() {
     const scanId = result?.id || searchParams.get('id');
     
     try {
-      await apiClient.post(`${API_URL}/api/v1/scan/${scanId}/stop`);
+      await apiClient.post(`/api/v1/scan/${scanId}/stop`);
       notifications.show({ 
         title: 'Запрос на остановку', 
         message: 'Сигнал остановки отправлен краулеру...', 
@@ -461,26 +481,82 @@ export default function ScanPage() {
     }
   }, [result?.id, searchParams, checkStatus]);
 
-  // Фильтрация нарушений
+  const handlePauseScan = useCallback(async () => {
+    if (!result?.id && !searchParams.get('id')) return;
+    const scanId = result?.id || searchParams.get('id');
+    try {
+      await apiClient.post(`/api/v1/scan/${scanId}/pause`);
+      notifications.show({ 
+        title: 'Запрос на паузу', 
+        message: 'Процесс приостанавливается, состояние будет сохранено...', 
+        color: 'yellow' 
+      });
+      if (scanId) checkStatus(scanId);
+    } catch (err: unknown) {
+      const msg = axios.isAxiosError(err) ? err.response?.data?.detail || err.message : String(err);
+      notifications.show({ title: 'Ошибка паузы', message: msg, color: 'red' });
+    }
+  }, [result?.id, searchParams, checkStatus]);
+
+  const handleResumeScan = useCallback(async () => {
+    if (!result?.id && !searchParams.get('id')) return;
+    const scanId = result?.id || searchParams.get('id');
+    try {
+      await apiClient.post(`/api/v1/scan/${scanId}/resume`);
+      notifications.show({ 
+        title: 'Возобновление', 
+        message: 'Процесс запускается с сохраненного места...', 
+        color: 'green' 
+      });
+      if (scanId) checkStatus(scanId);
+    } catch (err: unknown) {
+      const msg = axios.isAxiosError(err) ? err.response?.data?.detail || err.message : String(err);
+      notifications.show({ title: 'Ошибка возобновления', message: msg, color: 'red' });
+    }
+  }, [result?.id, searchParams, checkStatus]);
+
+  // Фильтрованные нарушения (для экспорта)
+  const filteredPages = useMemo(() => {
+    if (!result?.pages) return [];
+    return result.pages.filter(p => p.url !== INTERNAL_STATE_URL);
+  }, [result]);
+
   const filteredViolations = useMemo(() => {
-    if (!result) return [];
+    if (!result?.violations) return [];
+    
+    let filtered = result.violations.filter(v => {
+      // 1. Фильтр по глобальным исключениям
+      const isException = exceptions.some(e => 
+        e.word.toLowerCase() === (v.word || '').toLowerCase() ||
+        e.word.toLowerCase() === (v.normal_form || '').toLowerCase()
+      );
+      if (isException) return false;
+      return true;
+    });
 
-    let filtered = result.violations ? [...result.violations] : [];
     filtered = mapTrademarks(filtered, trademarks);
     filtered = filterByType(filtered, typeFilter);
     filtered = filterBySearch(filtered, debouncedSearchFilter);
-
     return filtered;
-  }, [result, trademarks, typeFilter, debouncedSearchFilter]);
+  }, [result?.violations, trademarks, exceptions, typeFilter, debouncedSearchFilter]);
 
-  // Фильтрация сгруппированных нарушений
+  // Фильтрация сгруппированных нарушений (для таблицы)
   const filteredGrouped = useMemo(() => {
-    let filtered = [...groupedViolations];
+    let filtered = groupedViolations.filter(v => {
+       // Фильтр по глобальным исключениям
+       const isException = exceptions.some(e => 
+        e.word.toLowerCase() === (v.word || '').toLowerCase() ||
+        e.word.toLowerCase() === (v.normal_form || '').toLowerCase()
+      );
+      if (isException) return false;
+      return true;
+    });
+
     filtered = mapTrademarks(filtered, trademarks);
     filtered = filterByType(filtered, typeFilter);
     filtered = filterBySearch(filtered, debouncedSearchFilter);
     return filtered;
-  }, [groupedViolations, trademarks, typeFilter, debouncedSearchFilter]);
+  }, [groupedViolations, trademarks, exceptions, typeFilter, debouncedSearchFilter]);
 
   // Пагинация
   const paginatedGrouped = useMemo(() => {
@@ -769,17 +845,43 @@ export default function ScanPage() {
               </SimpleGrid>
 
               {/* Индикатор прогресса */}
-              {result.status === 'in_progress' && (
+              {(['in_progress', 'started', 'pausing', 'paused', 'stopped'].includes(result.status)) && (
                 <Paper p="xl" radius="lg" withBorder role="status" aria-live="polite">
                   <Stack gap="md">
                     <Group justify="space-between">
                       <Stack gap={0}>
-                        <Text fw={700} size="lg">Идет активное сканирование...</Text>
+                        <Text fw={700} size="lg">
+                          {result.status === 'paused' ? 'Сканирование на паузе' : 
+                           result.status === 'stopped' ? 'Сканирование остановлено' : 
+                           'Идет активное сканирование...'}
+                        </Text>
                         <Text size="sm" c="dimmed">
                           Обработано {result.summary.total_pages} из {maxPages} ({progressValue.toFixed(0)}%)
                         </Text>
                       </Stack>
                       <Group gap="xs">
+                        {(['paused', 'stopped'].includes(result.status)) ? (
+                          <Button 
+                            variant="light" 
+                            color="green" 
+                            size="xs" 
+                            onClick={handleResumeScan}
+                            leftSection={<IconCheck size={14} />}
+                          >
+                            Продолжить
+                          </Button>
+                        ) : (
+                          <Button 
+                            variant="light" 
+                            color="yellow" 
+                            size="xs" 
+                            onClick={handlePauseScan}
+                            leftSection={<IconAlertTriangle size={14} />}
+                            disabled={result.status === 'pausing'}
+                          >
+                            Пауза
+                          </Button>
+                        )}
                         <Button 
                           variant="light" 
                           color="red" 
@@ -789,7 +891,9 @@ export default function ScanPage() {
                         >
                           Остановить
                         </Button>
-                        <Badge size="lg" variant="dot" color="blue">В ПРОЦЕССЕ</Badge>
+                        <Badge size="lg" variant="dot" color={result.status === 'paused' ? 'yellow' : result.status === 'stopped' ? 'orange' : 'blue'}>
+                          {result.status === 'paused' ? 'ПАУЗА' : result.status === 'stopped' ? 'ОСТАНОВЛЕНО' : 'В ПРОЦЕССЕ'}
+                        </Badge>
                       </Group>
                     </Group>
                     <Progress

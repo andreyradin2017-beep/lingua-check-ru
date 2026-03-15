@@ -1,13 +1,12 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Title, Stack, Table, Badge, Paper, Text, Button, Group, ActionIcon, Modal, Center, Tooltip, Pagination, Skeleton, Box } from '@mantine/core';
-import { IconTrash, IconHistory, IconFileAnalytics, IconPlayerStop, IconSearch, IconAdjustmentsHorizontal, IconAlertTriangle } from '@tabler/icons-react';
+import { IconTrash, IconHistory, IconFileAnalytics, IconPlayerStop, IconSearch, IconAdjustmentsHorizontal, IconAlertTriangle, IconPlayerPlay } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import apiClient from '../api/client';
 import { notifications } from '@mantine/notifications';
 import { useDisclosure } from '@mantine/hooks';
-import { API_URL } from '../config/api';
 import { translateScanStatus, getScanStatusColor } from '../utils/translations';
 
 interface ScanHistoryItem {
@@ -33,7 +32,7 @@ export default function HistoryPage() {
     try {
       if (showLoader) setLoading(true);
       setError(null);
-      const res = await apiClient.get(`${API_URL}/api/v1/scans`);
+      const res = await apiClient.get('/api/v1/scans');
       setScans(res.data || []);
     } catch (err) {
       console.error("Failed to load history", err);
@@ -81,7 +80,7 @@ export default function HistoryPage() {
     if (!selectedScanId) return;
     try {
       setLoading(true);
-      await apiClient.delete(`${API_URL}/api/v1/scan/${selectedScanId}`);
+      await apiClient.delete(`/api/v1/scan/${selectedScanId}`);
       setScans(prev => prev.filter(s => s.id !== selectedScanId));
       notifications.show({ title: 'Удалено', message: 'Отчет успешно удален', color: 'green' });
       closeDeleteConfirm();
@@ -97,7 +96,7 @@ export default function HistoryPage() {
   const confirmClearHistory = async () => {
     try {
       setLoading(true);
-      await apiClient.delete(`${API_URL}/api/v1/scans`);
+      await apiClient.delete('/api/v1/scans');
       setScans([]);
       notifications.show({ title: 'Очищено', message: 'Вся история успешно удалена', color: 'green' });
       closeClearConfirm();
@@ -111,11 +110,26 @@ export default function HistoryPage() {
 
   const stopScan = async (id: string, url: string) => {
     try {
-      await apiClient.post(`${API_URL}/api/v1/scan/${id}/stop`);
+      await apiClient.post(`/api/v1/scan/${id}/stop`);
       notifications.show({ title: 'Остановлено', message: `Сигнал остановки отправлен для ${url}`, color: 'orange' });
       fetchHistory(false);
     } catch {
       notifications.show({ title: 'Ошибка', message: 'Не удалось остановить', color: 'red' });
+    }
+  };
+
+  const resumeScan = async (id: string, url: string) => {
+    try {
+      await apiClient.post(`/api/v1/scan/${id}/resume`);
+      notifications.show({ 
+        title: 'Возобновлено', 
+        message: `Процесс возобновлен для ${url}`, 
+        color: 'green' 
+      });
+      fetchHistory(false);
+    } catch (err: unknown) {
+      const msg = axios.isAxiosError(err) ? err.response?.data?.detail || err.message : String(err);
+      notifications.show({ title: 'Ошибка возобновления', message: msg, color: 'red' });
     }
   };
 
@@ -243,6 +257,14 @@ export default function HistoryPage() {
                               <Tooltip label="Остановить">
                                 <ActionIcon color="yellow" variant="light" onClick={() => stopScan(scan.id, scan.target_url || '')}>
                                   <IconPlayerStop size={18} />
+                                </ActionIcon>
+                              </Tooltip>
+                            )}
+
+                            {(scan.status === 'paused' || scan.status === 'stopped') && (
+                              <Tooltip label="Продолжить">
+                                <ActionIcon color="green" variant="light" onClick={() => resumeScan(scan.id, scan.target_url || '')}>
+                                  <IconPlayerPlay size={18} />
                                 </ActionIcon>
                               </Tooltip>
                             )}

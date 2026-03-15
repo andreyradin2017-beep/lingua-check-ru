@@ -10,9 +10,33 @@ const apiClient = axios.create({
   timeout: API_TIMEOUT,
 });
 
-// ID активного уведомления о "прогреве"
+const STORAGE_KEY = 'linguacheck_last_response';
+
+// Инициализируем из localStorage, чтобы состояние сохранялось между вкладкаи и перезагрузками
+const getInitialLastResponse = () => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored ? parseInt(stored, 10) : 0;
+  } catch {
+    return 0;
+  }
+};
+
 let warmupNotificationId: string | null = null;
 let warmupTimer: ReturnType<typeof setTimeout> | null = null;
+let lastResponseTime = getInitialLastResponse();
+
+/**
+ * Обновляет время последнего успешного ответа и сохраняет в localStorage
+ */
+const updateLastResponseTime = () => {
+  lastResponseTime = Date.now();
+  try {
+    localStorage.setItem(STORAGE_KEY, lastResponseTime.toString());
+  } catch (e) {
+    // Игнорируем ошибки квоты или приватного режима
+  }
+};
 
 /**
  * Показывает уведомление о том, что бэкенд просыпается
@@ -60,8 +84,13 @@ const hideWarmupNotification = (success = true) => {
 
 // Интерцептор запросов
 apiClient.interceptors.request.use((config) => {
-  // Запускаем таймер на 5 секунд. Если за это время не придет ответ, покажем уведомление.
-  if (!warmupTimer && !warmupNotificationId) {
+  const now = Date.now();
+  // Render.com засыпает через 15 минут бездействия.
+  // Показываем уведомление только если с последнего ответа прошло более 14 минут
+  // или если это вообще первый запрос в сессии.
+  const isLikelySleeping = lastResponseTime === 0 || (now - lastResponseTime > 14 * 60 * 1000);
+
+  if (isLikelySleeping && !warmupTimer && !warmupNotificationId) {
     warmupTimer = setTimeout(() => {
       showWarmupNotification();
     }, 5000);
@@ -73,9 +102,14 @@ apiClient.interceptors.request.use((config) => {
 
 // Интерцептор ответов
 apiClient.interceptors.response.use((response) => {
+  updateLastResponseTime();
   hideWarmupNotification(true);
   return response;
 }, (error) => {
+  // Даже при ошибке, если бэкенд ответил (например, 404 или 500), он НЕ спит.
+  if (error.response) {
+    updateLastResponseTime();
+  }
   hideWarmupNotification(false);
   return Promise.reject(error);
 });

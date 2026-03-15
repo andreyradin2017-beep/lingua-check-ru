@@ -36,38 +36,91 @@ if sys.platform == "win32":
         )
 
 _ACTIVE_SCANS: dict[str, dict] = {}
+# Константа для идентификации строки состояния в БД
+INTERNAL_STATE_URL = "__internal_crawler_state__"
+
+async def _save_scan_state(scan_id: str, visited: set[str], queue: list[tuple[str, int]]) -> None:
+    """ Сохраняет состояние краулера в БД через служебную запись в таблице pages. """
+    try:
+        client = await get_async_supabase()
+        state_data = {
+            "visited": list(visited),
+            "queue": queue
+        }
+        state_json = json.dumps(state_data)
+        
+        # Проверяем, есть ли уже запись состояния
+        resp = await client.table("pages").select("id").eq("scan_id", scan_id).eq("url", INTERNAL_STATE_URL).execute()
+        
+        if resp.data:
+            await client.table("pages").update({"content_hash": state_json}).eq("id", resp.data[0]["id"]).execute()
+        else:
+            await client.table("pages").insert({
+                "scan_id": scan_id,
+                "url": INTERNAL_STATE_URL,
+                "content_hash": state_json,
+                "status": "internal",
+                "depth": 0
+            }).execute()
+        logger.info(f"Scan {scan_id}: state saved to DB")
+    except Exception as e:
+        logger.error(f"Scan {scan_id}: failed to save state: {e}")
+
+async def _load_scan_state(scan_id: str) -> Optional[dict]:
+    """ Загружает состояние краулера из БД. """
+    try:
+        client = await get_async_supabase()
+        resp = await client.table("pages").select("content_hash").eq("scan_id", scan_id).eq("url", INTERNAL_STATE_URL).execute()
+        if resp.data and resp.data[0].get("content_hash"):
+            return json.loads(resp.data[0]["content_hash"])
+    except Exception as e:
+        logger.error(f"Scan {scan_id}: failed to load state: {e}")
+    return None
 
 def _is_russian_page(text: str) -> bool:
-    """Простая эвристика: есть ли в тексте кириллица."""
-    return any("\u0400" <= ch <= "\u04ff" for ch in text)
+    """ Улучшенная эвристика: проверка плотности кириллицы. """
+    if not text:
+        return False
+    # Считаем кириллические символы
+    cyrillic_chars = len(re.findall(r'[\u0400-\u04ff]', text))
+    if cyrillic_chars > 100: # Если много кириллицы - точно русская
+        return True
+    # Если мало - проверяем процент от общего количества букв
+    letters = len(re.findall(r'[a-zA-Z\u0400-\u04ff]', text))
+    if letters == 0:
+        return False
+    return (cyrillic_chars / letters) > 0.2  # Минимум 20% кириллицы
 
-def _run_scan_in_thread(scan_id: str, url: str, max_depth: int, max_pages: int) -> None:
+def _run_scan_in_thread(scan_id: str, url: str, max_depth: int, max_pages: int, is_resume: bool = False) -> None:
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
-        loop.run_until_complete(_run_scan(scan_id, url, max_depth, max_pages))
+        loop.run_until_complete(_run_scan(scan_id, url, max_depth, max_pages, is_resume=is_resume))
     except Exception as e:
         logger.exception("Scan thread %s failed: %s", scan_id, e)
     finally:
         loop.close()
 
-async def start_scan_background(scan_id: str, url: str, max_depth: int, max_pages: int) -> None:
+async def start_scan_background(scan_id: str, url: str, max_depth: int, max_pages: int, is_resume: bool = False) -> None:
     stop_event = threading.Event()
+    pause_event = threading.Event()
     _ACTIVE_SCANS[scan_id] = {
         "stop_event": stop_event,
+        "pause_event": pause_event,
         "queue_size": 0,
-        "processed_count": 0
+        "processed_count": 0,
+        "is_resume": is_resume
     }
     t = threading.Thread(
         target=_run_scan_in_thread,
-        args=(scan_id, url, max_depth, max_pages),
+        args=(scan_id, url, max_depth, max_pages, is_resume),
         name=f"scan-{scan_id}",
         daemon=True,
     )
     t.start()
-    logger.info("Scan %s: thread started", scan_id)
+    logger.info("Scan %s: thread started (resume=%s)", scan_id, is_resume)
 
 def stop_scan(scan_id: str) -> bool:
     if scan_id in _ACTIVE_SCANS:
@@ -76,11 +129,19 @@ def stop_scan(scan_id: str) -> bool:
         return True
     return False
 
+def pause_scan(scan_id: str) -> bool:
+    """ Устанавливает событие паузы для скана. """
+    if scan_id in _ACTIVE_SCANS:
+        _ACTIVE_SCANS[scan_id]["pause_event"].set()
+        logger.info("Scan %s: pause signal sent", scan_id)
+        return True
+    return False
+
 def get_scan_metadata(scan_id: str) -> dict:
     """Возвращает метаданные активного скана (очередь, прогресс)."""
     return _ACTIVE_SCANS.get(scan_id, {})
 
-async def _run_scan(scan_id: str, url: str, max_depth: int, max_pages: int) -> None:
+async def _run_scan(scan_id: str, url: str, max_depth: int, max_pages: int, is_resume: bool = False) -> None:
     logger.info("Scan %s: starting for %s", scan_id, url)
     client = await get_async_supabase()
     try:
@@ -155,8 +216,29 @@ async def _get_urls_from_sitemap(start_url: str) -> list[str]:
             except Exception as e:
                 logger.debug(f"Error parsing sitemap {s_url}: {e}")
 
-    # Фильтруем только страницы этого же домена
-    result = [url for url in all_pages if urlparse(url).netloc == parsed_start.netloc]
+def _is_excluded_url(url: str) -> bool:
+    """Проверяет, должен ли URL быть исключен по языковому признаку."""
+    parsed = urlparse(url)
+    path = parsed.path.lower()
+    # Исключаем типичные языковые префиксы и пути
+    excluded_patterns = [
+        r'^/(en|eng|us|uk|de|fr|es|it|ja|zh|cn)(/|$)',
+        r'/(en|eng|us|uk|de|fr|es|it|ja|zh|cn)/',
+        r'\.(en|eng|us|uk|de|fr|es|it|ja|zh|cn)\.',
+    ]
+    for pattern in excluded_patterns:
+        if re.search(pattern, path):
+            return True
+            
+    # Также проверяем query params если нужно, но пока ограничимся путем
+    return False
+
+# Фильтруем только страницы этого же домена
+    result = []
+    for url in all_pages:
+        if urlparse(url).netloc == parsed_start.netloc:
+            if not _is_excluded_url(url):
+                result.append(url)
     return list(set(result))
 
 async def _scrape_site(scan_id: str, start_url: str, max_depth: int, max_pages: int, client: any) -> None:
@@ -171,9 +253,25 @@ async def _scrape_site(scan_id: str, start_url: str, max_depth: int, max_pages: 
     queue: list[tuple[str, int]] = []
     pages_count = 0
     stop_event = _ACTIVE_SCANS.get(scan_id, {}).get("stop_event")
+    pause_event = _ACTIVE_SCANS.get(scan_id, {}).get("pause_event")
 
-    # 1. Попытка получить URL из Sitemap (только если глубина > 0)
-    if max_depth > 0:
+    # 1. Загрузка состояния если это возобновление
+    if is_resume:
+        state = await _load_scan_state(scan_id)
+        if state:
+            visited = set(state.get("visited", []))
+            queue = state.get("queue", [])
+            logger.info(f"Scan {scan_id}: resumed with {len(visited)} visited and {len(queue)} in queue")
+            # Получаем текущее кол-во страниц из БД
+            client_db = await get_async_supabase()
+            count_resp = await client_db.table("pages").select("id", count="exact").eq("scan_id", scan_id).neq("url", INTERNAL_STATE_URL).execute()
+            pages_count = count_resp.count or 0
+        else:
+            logger.warning(f"Scan {scan_id}: resume requested but no state found, starting fresh")
+            is_resume = False
+
+    # 2. Попытка получить URL из Sitemap (только если НЕ возобновление и глубина > 0)
+    if not is_resume and max_depth > 0:
         sitemap_urls = await _get_urls_from_sitemap(start_url)
         if sitemap_urls:
             logger.info(f"Scan {scan_id}: found {len(sitemap_urls)} URLs in sitemap")
@@ -265,8 +363,9 @@ async def _scrape_site(scan_id: str, start_url: str, max_depth: int, max_pages: 
                             for link in set(links):
                                 link = link.split('#')[0].rstrip('/')
                                 if link not in visited and urlparse(link).netloc == base_domain:
-                                    if link not in [q[0] for q in queue]:
-                                        queue.append((link, depth + 1))
+                                    if not _is_excluded_url(link):
+                                        if link not in [q[0] for q in queue]:
+                                            queue.append((link, depth + 1))
                 except Exception as e:
                     logger.warning("Scan %s: error %s — %s. Fallback to httpx...", scan_id, current_url, e)
                     try:
@@ -336,6 +435,24 @@ async def _scrape_site(scan_id: str, start_url: str, max_depth: int, max_pages: 
             # Ждем завершения хотя бы одной задачи
             done, pending_tasks = await asyncio.wait(pending_tasks, return_when=asyncio.FIRST_COMPLETED)
             
+            # Проверка на паузу
+            if pause_event and pause_event.is_set():
+                logger.info(f"Scan {scan_id}: pause requested")
+                # Ждем завершения текущих активных страниц чтобы сохранить чистый стейт
+                if pending_tasks:
+                    await asyncio.gather(*pending_tasks, return_exceptions=True)
+                
+                # Сохраняем стейт в БД
+                await _save_scan_state(scan_id, visited, queue)
+                
+                # Обновляем статус в БД
+                client_db = await get_async_supabase()
+                await client_db.table("scans").update({
+                    "status": "paused"
+                }).eq("id", scan_id).execute()
+                
+                break
+
             # Обновляем инфо об очереди для UI
             if scan_id in _ACTIVE_SCANS:
                 _ACTIVE_SCANS[scan_id]["queue_size"] = len(queue) + len(pending_tasks)

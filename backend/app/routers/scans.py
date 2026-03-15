@@ -97,6 +97,54 @@ async def stop_scan_endpoint(scan_id: str):
     return {"status": "stopping", "scan_id": scan_id}
 
 
+@router.post("/scan/{scan_id}/pause")
+async def pause_scan_endpoint(scan_id: str):
+    """
+    Приостанавливает активное сканирование.
+    """
+    from app.services.scan_service import pause_scan
+    success = pause_scan(scan_id)
+    if success:
+        return {"status": "pausing", "scan_id": scan_id}
+    
+    # Если в памяти нет — может он уже на паузе или завершен
+    client = await get_async_supabase()
+    resp = await client.table("scans").select("status").eq("id", scan_id).execute()
+    if not resp.data:
+        raise HTTPException(status_code=404, detail="Скан не найден")
+    
+    return {"status": "ignored", "message": "Скан не активен", "current_status": resp.data[0]["status"]}
+
+
+@router.post("/scan/{scan_id}/resume")
+async def resume_scan_endpoint(scan_id: str):
+    """
+    Возобновляет ранее приостановленное сканирование.
+    """
+    client = await get_async_supabase()
+    resp = await client.table("scans").select("*").eq("id", scan_id).execute()
+    if not resp.data:
+        raise HTTPException(status_code=404, detail="Скан не найден")
+    
+    scan = resp.data[0]
+    if scan["status"] != "paused":
+        return {"status": "ignored", "message": "Можно возобновить только сканы в статусе paused", "current_status": scan["status"]}
+    
+    # Обновляем статус обратно на started/in_progress
+    await client.table("scans").update({"status": "started"}).eq("id", scan_id).execute()
+    
+    # Запуск в фоне через Celery с флагом resume
+    run_scan_task.delay(
+        scan_id, 
+        scan["target_url"], 
+        scan["max_depth"], 
+        scan["max_pages"],
+        is_resume=True
+    )
+    
+    return {"status": "resuming", "scan_id": scan_id}
+
+
 @router.get("/scans", response_model=list[ScanHistoryItem])
 async def get_scans() -> list[ScanHistoryItem]:
     """Возвращает историю сканирований от новых к старым."""

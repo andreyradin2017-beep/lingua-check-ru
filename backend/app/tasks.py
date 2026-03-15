@@ -8,17 +8,15 @@ from datetime import datetime, timezone
 logger = logging.getLogger(__name__)
 
 @celery_app.task(bind=True, name="app.tasks.run_scan_task")
-def run_scan_task(self, scan_id: str, url: str, max_depth: int, max_pages: int):
+def run_scan_task(self, scan_id: str, url: str, max_depth: int, max_pages: int, is_resume: bool = False):
     """
     Фоновая задача для запуска сканирования.
     """
-    logger.info(f"Starting Celery task for scan {scan_id} (URL: {url}) - Eager Mode: {self.app.conf.task_always_eager}")
+    logger.info(f"Starting Celery task for scan {scan_id} (URL: {url}, resume={is_resume})")
     
     async def run_async_scan():
-        logger.info(f"Inside run_async_scan for {scan_id}")
         try:
-            logger.info(f"Calling _run_scan for {scan_id}")
-            await _run_scan(scan_id, url, max_depth, max_pages)
+            await _run_scan(scan_id, url, max_depth, max_pages, is_resume=is_resume)
             logger.info(f"Scan {scan_id} completed successfully via Celery task")
         except Exception as e:
             logger.exception(f"Error in Celery scan task {scan_id}: {e}")
