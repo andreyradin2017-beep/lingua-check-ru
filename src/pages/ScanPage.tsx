@@ -515,11 +515,6 @@ export default function ScanPage() {
     }
   }, [result?.id, searchParams, checkStatus]);
 
-  // Фильтрованные нарушения (для экспорта)
-  const filteredPages = useMemo(() => {
-    if (!result?.pages) return [];
-    return result.pages.filter(p => p.url !== INTERNAL_STATE_URL);
-  }, [result]);
 
   const filteredViolations = useMemo(() => {
     if (!result?.violations) return [];
