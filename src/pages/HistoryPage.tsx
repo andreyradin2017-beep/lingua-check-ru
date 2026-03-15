@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Title, Stack, Table, Badge, Paper, Text, Button, Group, ActionIcon, Modal, Center, Tooltip, Pagination, Skeleton, Box, Container } from '@mantine/core';
+import { Title, Stack, Table, Badge, Paper, Text, Button, Group, ActionIcon, Modal, Center, Tooltip, Pagination, Skeleton, Box } from '@mantine/core';
 import { IconTrash, IconHistory, IconFileAnalytics, IconPlayerStop, IconSearch, IconAdjustmentsHorizontal, IconAlertTriangle } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import apiClient from '../api/client';
 import { notifications } from '@mantine/notifications';
 import { useDisclosure } from '@mantine/hooks';
 import { API_URL } from '../config/api';
@@ -32,7 +33,7 @@ export default function HistoryPage() {
     try {
       if (showLoader) setLoading(true);
       setError(null);
-      const res = await axios.get(`${API_URL}/api/v1/scans`);
+      const res = await apiClient.get(`${API_URL}/api/v1/scans`);
       setScans(res.data || []);
     } catch (err) {
       console.error("Failed to load history", err);
@@ -80,7 +81,7 @@ export default function HistoryPage() {
     if (!selectedScanId) return;
     try {
       setLoading(true);
-      await axios.delete(`${API_URL}/api/v1/scan/${selectedScanId}`);
+      await apiClient.delete(`${API_URL}/api/v1/scan/${selectedScanId}`);
       setScans(prev => prev.filter(s => s.id !== selectedScanId));
       notifications.show({ title: 'Удалено', message: 'Отчет успешно удален', color: 'green' });
       closeDeleteConfirm();
@@ -96,7 +97,7 @@ export default function HistoryPage() {
   const confirmClearHistory = async () => {
     try {
       setLoading(true);
-      await axios.delete(`${API_URL}/api/v1/scans`);
+      await apiClient.delete(`${API_URL}/api/v1/scans`);
       setScans([]);
       notifications.show({ title: 'Очищено', message: 'Вся история успешно удалена', color: 'green' });
       closeClearConfirm();
@@ -110,7 +111,7 @@ export default function HistoryPage() {
 
   const stopScan = async (id: string, url: string) => {
     try {
-      await axios.post(`${API_URL}/api/v1/scan/${id}/stop`);
+      await apiClient.post(`${API_URL}/api/v1/scan/${id}/stop`);
       notifications.show({ title: 'Остановлено', message: `Сигнал остановки отправлен для ${url}`, color: 'orange' });
       fetchHistory(false);
     } catch {
@@ -119,7 +120,7 @@ export default function HistoryPage() {
   };
 
   return (
-    <Container size="xl">
+    <>
       <Helmet>
         <title>История проверок — LinguaCheck RU</title>
       </Helmet>
@@ -289,6 +290,6 @@ export default function HistoryPage() {
           </Group>
         </Stack>
       </Modal>
-    </Container>
+    </>
   );
 }

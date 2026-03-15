@@ -13,17 +13,18 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import {
   Title, Stack, Group, SimpleGrid, Grid, Badge, Text, TextInput, NumberInput,
   Paper, Table, Progress, Button, Pagination, Center, MultiSelect, Tooltip,
-  ActionIcon, Container, Box, Skeleton
+  ActionIcon, Box, Skeleton
 } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
 import {
   IconSearch, IconAlertTriangle, IconCheck, IconFileSpreadsheet,
-  IconFileTypePdf, IconFilter, IconBookmark, IconShieldCheck
+  IconFileTypePdf, IconFilter, IconBookmark, IconShieldCheck, IconInfoCircle
 } from '@tabler/icons-react';
 import { useSearchParams } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
 import axios from 'axios';
 import { Helmet } from 'react-helmet-async';
+import apiClient from '../api/client';
 import { API_URL } from '../config/api';
 import { isValidUrl } from '../utils/validation';
 import { mapTrademarks, filterByType, filterBySearch, type Trademark } from '../utils/trademarkMapper';
@@ -273,7 +274,7 @@ export default function ScanPage() {
   // Загрузка брендов
   const fetchTrademarks = useCallback(async () => {
     try {
-      const res = await axios.get(`${API_URL}/api/v1/trademarks`);
+      const res = await apiClient.get(`${API_URL}/api/v1/trademarks`);
       setTrademarks(res.data);
     } catch (err: unknown) {
       console.error('Failed to fetch trademarks', err);
@@ -308,12 +309,12 @@ export default function ScanPage() {
   const checkStatus = useCallback(async (id: string, retryCount = 0) => {
     try {
       setScanError(null);
-      const res = await axios.get(`${API_URL}/api/v1/scan/${id}`);
+      const res = await apiClient.get(`${API_URL}/api/v1/scan/${id}`);
       setResult(res.data);
 
       if (res.data.summary && res.data.summary.total_violations > 0) {
         try {
-          const groupedRes = await axios.get(`${API_URL}/api/v1/scan/${id}/grouped`);
+          const groupedRes = await apiClient.get(`${API_URL}/api/v1/scan/${id}/grouped`);
           setGroupedViolations(Array.isArray(groupedRes.data) ? groupedRes.data : []);
         } catch (err) {
           console.error('Failed to load grouped violations', err);
@@ -366,7 +367,7 @@ export default function ScanPage() {
   const addTrademark = useCallback(async (word: string) => {
     if (!word) return;
     try {
-      await axios.post(`${API_URL}/api/v1/trademarks`, { word });
+      await apiClient.post(`${API_URL}/api/v1/trademarks`, { word });
       notifications.show({ 
         title: 'Бренд добавлен', 
         message: `Слово "${word}" теперь исключено из нарушений`, 
@@ -383,7 +384,7 @@ export default function ScanPage() {
   const addException = useCallback(async (word: string) => {
     if (!word) return;
     try {
-      await axios.post(`${API_URL}/api/v1/exceptions`, { word });
+      await apiClient.post(`${API_URL}/api/v1/exceptions`, { word });
       notifications.show({ 
         title: 'Добавлено в исключения', 
         message: `Слово "${word}" добавлено в глобальные исключения`, 
@@ -417,7 +418,7 @@ export default function ScanPage() {
     setPage(1);
     
     try {
-      const res = await axios.post(`${API_URL}/api/v1/scan`, {
+      const res = await apiClient.post(`${API_URL}/api/v1/scan`, {
         url: targetUrl,
         max_depth: Number(depth),
         max_pages: Number(maxPages),
@@ -573,36 +574,48 @@ export default function ScanPage() {
         <meta name="description" content="Глубокий анализ сайтов на соответствие нормам русского языка и ФЗ №168-ФЗ." />
       </Helmet>
       
-      <Container size="xl">
         <Stack gap="xl">
           {/* Заголовок */}
-          <Stack gap={0}>
+          <Stack gap={0} mb="xl">
             <Title order={2} size={32} fw={900}>Сканирование сайтов</Title>
             <Text c="dimmed" size="lg">Глубокий анализ доменных зон на соответствие ФЗ №168‑ФЗ</Text>
           </Stack>
 
           {/* Форма сканирования */}
-          <Paper p="xl" radius="lg" role="form" aria-label="Форма сканирования сайта">
+          <Paper 
+            p="xl" 
+            radius="lg" 
+            withBorder
+            style={{ 
+              background: 'rgba(255, 255, 255, 0.05)', 
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255, 255, 255, 0.1)'
+            }}
+            role="form" 
+            aria-label="Форма сканирования сайта"
+          >
             <Stack gap="xl">
-              <Grid gutter="lg" align="stretch">
-                <Grid.Col span={{ base: 12, md: 9 }}>
+              <Grid gutter="lg" align="flex-end">
+                <Grid.Col span={{ base: 12, md: 7 }}>
                   <TextInput
                     label="URL сайта"
                     placeholder="https://example.com"
-                    description="Обязательно укажите протокол http:// или https://"
                     size="md"
                     value={url}
                     onChange={(e) => setUrl(e.currentTarget.value)}
                     leftSection={<IconSearch size={18} />}
+                    rightSection={
+                      <Tooltip label="Обязательно укажите протокол http:// или https://" withArrow>
+                        <IconInfoCircle size={18} style={{ color: 'var(--mantine-color-dimmed)', cursor: 'help' }} />
+                      </Tooltip>
+                    }
                     error={url && !url.startsWith('http') ? 'URL должен начинаться с http:// или https://' : null}
                     aria-required="true"
-                    h="100%"
                   />
                 </Grid.Col>
-                <Grid.Col span={{ base: 12, sm: 6, md: 1.5 }}>
+                <Grid.Col span={{ base: 6, md: 2 }}>
                   <NumberInput
                     label="Глубина"
-                    description="От 0 до 5 уровней"
                     min={0}
                     max={5}
                     size="md"
@@ -611,38 +624,41 @@ export default function ScanPage() {
                       setDepth(val);
                       if (val === 0) setMaxPages(1);
                     }}
-                    aria-describedby="depth-description"
-                    h="100%"
+                    rightSection={
+                      <Tooltip label="Количество уровней вложенности ссылок (0-5)" withArrow>
+                        <IconInfoCircle size={18} style={{ color: 'var(--mantine-color-dimmed)', cursor: 'help' }} />
+                      </Tooltip>
+                    }
                   />
                 </Grid.Col>
-                <Grid.Col span={{ base: 12, sm: 6, md: 1.5 }}>
+                <Grid.Col span={{ base: 6, md: 2 }}>
                   <NumberInput
-                    label="Лимит страниц"
-                    description="Макс. 1000"
+                    label="Лимит"
                     min={1}
                     max={1000}
                     size="md"
                     value={maxPages}
                     onChange={(val) => setMaxPages(val)}
-                    aria-describedby="limit-description"
-                    h="100%"
+                    rightSection={
+                      <Tooltip label="Максимальное количество страниц (до 1000)" withArrow>
+                        <IconInfoCircle size={18} style={{ color: 'var(--mantine-color-dimmed)', cursor: 'help' }} />
+                      </Tooltip>
+                    }
                   />
                 </Grid.Col>
+                <Grid.Col span={{ base: 12, md: 1 }}>
+                  <Button
+                    fullWidth
+                    size="md"
+                    onClick={startScan}
+                    loading={loading}
+                    disabled={!url}
+                    aria-label="Запустить анализ сайта"
+                  >
+                    <IconSearch size={20} />
+                  </Button>
+                </Grid.Col>
               </Grid>
-
-              <Group justify="flex-end">
-                <Button
-                  size="lg"
-                  onClick={startScan}
-                  loading={loading}
-                  disabled={!url}
-                  px={40}
-                  leftSection={<IconSearch size={22} />}
-                  aria-label="Запустить анализ сайта"
-                >
-                  Запустить анализ
-                </Button>
-              </Group>
             </Stack>
           </Paper>
 
@@ -845,7 +861,6 @@ export default function ScanPage() {
             </Stack>
           )}
         </Stack>
-      </Container>
     </Stack>
   );
 }

@@ -3,6 +3,7 @@ import { Helmet } from 'react-helmet-async';
 import { Title, Stack, Table, Text, Button, Group, ActionIcon, Paper, TextInput, Card, Badge, Loader, Center } from '@mantine/core';
 import { IconTrash, IconPlus, IconAlertCircle, IconCheck } from '@tabler/icons-react';
 import axios from 'axios';
+import apiClient from '../api/client';
 import { notifications } from '@mantine/notifications';
 import { API_URL } from '../config/api';
 
@@ -21,7 +22,7 @@ export default function ExceptionsPage() {
   const fetchExceptions = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${API_URL}/api/v1/exceptions`);
+      const res = await apiClient.get(`${API_URL}/api/v1/exceptions`);
       setExceptions(res.data);
     } catch (err) {
       console.error("Failed to load exceptions", err);
@@ -41,7 +42,7 @@ export default function ExceptionsPage() {
 
     setAddLoading(true);
     try {
-      const res = await axios.post(`${API_URL}/api/v1/exceptions`, { word });
+      const res = await apiClient.post(`${API_URL}/api/v1/exceptions`, { word });
       setExceptions([res.data, ...exceptions]);
       setNewWord('');
       notifications.show({ title: 'Добавлено', message: `Слово "${word}" добавлено в исключения`, color: 'green', icon: <IconCheck size={16} /> });
@@ -55,7 +56,7 @@ export default function ExceptionsPage() {
 
   const handleDelete = async (id: string, word: string) => {
     try {
-      await axios.delete(`${API_URL}/api/v1/exceptions/${id}`);
+      await apiClient.delete(`${API_URL}/api/v1/exceptions/${id}`);
       setExceptions(exceptions.filter(e => e.id !== id));
       notifications.show({ title: 'Удалено', message: `Слово "${word}" удалено из исключений`, color: 'blue' });
     } catch (err) {

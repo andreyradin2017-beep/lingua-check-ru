@@ -16,8 +16,9 @@ import {
 } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { IconFileText, IconTypography, IconAlertCircle, IconCheck, IconFileCheck, IconFileSpreadsheet, IconFileTypePdf } from '@tabler/icons-react';
-import { notifications } from '@mantine/notifications';
 import axios from 'axios';
+import { notifications } from '@mantine/notifications';
+import apiClient from '../api/client';
 import { API_URL } from '../config/api';
 import { sanitizeText } from '../utils/sanitize';
 import { translateViolationType } from '../utils/translations';
@@ -58,7 +59,7 @@ export default function TextPage() {
     setResult(null);
     setPage(1);
     try {
-      const res = await axios.post(`${API_URL}/api/v1/check_text`, {
+      const res = await apiClient.post(`${API_URL}/api/v1/check_text`, {
         text,
         format: 'plain'
       });
@@ -80,7 +81,7 @@ export default function TextPage() {
     const formData = new FormData();
     formData.append('file', file);
     try {
-      const res = await axios.post(`${API_URL}/api/v1/check_text/upload`, formData);
+      const res = await apiClient.post(`${API_URL}/api/v1/check_text/upload`, formData);
       setResult(res.data);
       notifications.show({ 
         title: 'Файл загружен', 

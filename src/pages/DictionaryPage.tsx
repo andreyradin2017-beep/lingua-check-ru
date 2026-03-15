@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Title, Card, Stack, Group, SimpleGrid, Badge, Text, Loader, Center } from '@mantine/core';
 import { IconBooks, IconDatabase, IconAlertCircle } from '@tabler/icons-react';
-import axios from 'axios';
+import apiClient from '../api/client';
 import { API_URL } from '../config/api';
 
 interface DictionaryVersion {
@@ -16,7 +16,7 @@ export default function DictionaryPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    axios.get(`${API_URL}/api/v1/dictionary_preview`)
+    apiClient.get(`${API_URL}/api/v1/dictionary_preview`)
       .then(res => {
         // The provided code edit was syntactically incorrect and introduced unrelated logic.
         // Assuming the intent was to add a safety check for the dictionary_versions data.

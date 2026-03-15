@@ -1,8 +1,10 @@
+import { useEffect } from 'react';
 import { AppShell, Burger, Group, NavLink, Title, Text, Container, Stack, ActionIcon, Tooltip, useMantineColorScheme } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { IconGlobe, IconFileText, IconBooks, IconHome, IconSearch, IconHistory, IconX, IconSun, IconMoon } from '@tabler/icons-react';
 import { HelmetProvider } from 'react-helmet-async';
+import apiClient from './api/client';
 
 // Импортируем страницы (создадим их следом)
 import HomePage from './pages/HomePage';
@@ -19,6 +21,13 @@ export default function App() {
   const { toggleColorScheme } = useMantineColorScheme();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Фоновый пинг бэкенда при загрузке приложения для пробуждения Render
+  useEffect(() => {
+    apiClient.get('/api/v1/health').catch(() => {
+      // Игнорируем ошибки, цель — просто "пнуть" сервер
+    });
+  }, []);
 
   const navItems = [
     { label: 'Главная', icon: <IconHome size="1rem" />, path: '/' },
