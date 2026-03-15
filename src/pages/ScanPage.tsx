@@ -806,8 +806,6 @@ export default function ScanPage() {
                         />
                       </Box>
                     </Grid.Col>
-                      />
-                    </Grid.Col>
                   </Grid>
 
                   {groupedViolations.length === 0 ? (
