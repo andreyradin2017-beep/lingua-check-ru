@@ -501,7 +501,17 @@ export default function ScanPage() {
     if (!result?.id && !searchParams.get('id')) return;
     const scanId = result?.id || searchParams.get('id');
     try {
-      await apiClient.post(`/api/v1/scan/${scanId}/resume`);
+      const response = await apiClient.post(`/api/v1/scan/${scanId}/resume`);
+      
+      if (response.data.status === 'ignored') {
+        notifications.show({ 
+          title: 'Возобновление невозможно', 
+          message: response.data.message, 
+          color: 'yellow' 
+        });
+        return;
+      }
+
       notifications.show({ 
         title: 'Возобновление', 
         message: 'Процесс запускается с сохраненного места...', 

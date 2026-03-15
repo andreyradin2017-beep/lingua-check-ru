@@ -419,6 +419,8 @@ async def _scrape_site(scan_id: str, start_url: str, max_depth: int, max_pages: 
         pending_tasks = set()
         while (queue or pending_tasks) and pages_count < max_pages:
             if stop_event and stop_event.is_set():
+                logger.info(f"Scan {scan_id}: stop requested, saving state...")
+                await _save_scan_state(scan_id, visited, queue)
                 break
             
             # Добавляем новые задачи если есть место в очереди и лимит страниц не достигнут

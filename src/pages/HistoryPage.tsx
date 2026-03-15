@@ -120,7 +120,17 @@ export default function HistoryPage() {
 
   const resumeScan = async (id: string, url: string) => {
     try {
-      await apiClient.post(`/api/v1/scan/${id}/resume`);
+      const response = await apiClient.post(`/api/v1/scan/${id}/resume`);
+      
+      if (response.data.status === 'ignored') {
+        notifications.show({ 
+          title: 'Возобновление невозможно', 
+          message: response.data.message, 
+          color: 'yellow' 
+        });
+        return;
+      }
+
       notifications.show({ 
         title: 'Возобновлено', 
         message: `Процесс возобновлен для ${url}`, 
