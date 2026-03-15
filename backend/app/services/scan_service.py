@@ -152,7 +152,7 @@ async def _run_scan(scan_id: str, url: str, max_depth: int, max_pages: int, is_r
         return
 
     try:
-        await _scrape_site(scan_id, url, max_depth, max_pages, client)
+        await _scrape_site(scan_id, url, max_depth, max_pages, client, is_resume=is_resume)
         status = "completed"
         # Проверяем, был ли скан остановлен пользователем
         if scan_id in _ACTIVE_SCANS and _ACTIVE_SCANS[scan_id]["stop_event"].is_set():
@@ -217,6 +217,14 @@ async def _get_urls_from_sitemap(start_url: str) -> list[str]:
             except Exception as e:
                 logger.debug(f"Error parsing sitemap {s_url}: {e}")
 
+    # Фильтруем только страницы этого же домена
+    result = []
+    for url in all_pages:
+        if urlparse(url).netloc == parsed_start.netloc:
+            if not _is_excluded_url(url):
+                result.append(url)
+    return list(set(result))
+
 def _is_excluded_url(url: str) -> bool:
     """Проверяет, должен ли URL быть исключен по языковому признаку."""
     parsed = urlparse(url)
@@ -234,15 +242,7 @@ def _is_excluded_url(url: str) -> bool:
     # Также проверяем query params если нужно, но пока ограничимся путем
     return False
 
-# Фильтруем только страницы этого же домена
-    result = []
-    for url in all_pages:
-        if urlparse(url).netloc == parsed_start.netloc:
-            if not _is_excluded_url(url):
-                result.append(url)
-    return list(set(result))
-
-async def _scrape_site(scan_id: str, start_url: str, max_depth: int, max_pages: int, client: any) -> None:
+async def _scrape_site(scan_id: str, start_url: str, max_depth: int, max_pages: int, client: any, is_resume: bool = False) -> None:
     try:
         from playwright.async_api import async_playwright
     except ImportError:
