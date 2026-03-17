@@ -633,9 +633,16 @@ export default function ScanPage() {
 
   const progressValue = useMemo(() => {
     if (!result?.summary) return 0;
-    const total = result.summary.total_pages + (result.summary.pending_pages || 0);
-    return total > 0 ? (result.summary.total_pages / Number(maxPages) * 100) : 5;
-  }, [result?.summary, maxPages]);
+    // Используем сумму обработанных и ожидающих страниц как текущий знаменатель
+    const totalFound = result.summary.total_pages + (result.summary.pending_pages || 0);
+    if (totalFound === 0) return 0;
+    
+    // Прогресс - это процент обработанных от всех найденных на данный момент
+    const progress = (result.summary.total_pages / totalFound) * 100;
+    
+    // Если мы еще в самом начале, покажем хотя бы 5%, чтобы индикатор не был пустым
+    return Math.max(progress, result.status === 'in_progress' ? 5 : 0);
+  }, [result?.summary, result?.status]);
 
   return (
     <Stack gap="xl" className="page-transition">
@@ -818,11 +825,7 @@ export default function ScanPage() {
                            'Идет активное сканирование...'}
                         </Text>
                         <Text size="sm" c="dimmed">
-                          Обработано {result.summary.total_pages} стр.
-                          {result.summary.total_discovered 
-                            ? ` из ${result.summary.total_discovered} найденных в sitemap` 
-                            : ` (лимит: ${maxPages})`
-                          }
+                          Обработано {result.summary.total_pages} стр. из {result.summary.total_pages + (result.summary.pending_pages || 0)} обнаруженных
                           {' '}({progressValue.toFixed(0)}%)
                         </Text>
                       </Stack>

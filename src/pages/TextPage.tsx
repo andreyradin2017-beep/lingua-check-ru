@@ -25,8 +25,9 @@ import { translateViolationType } from '../utils/translations';
 
 // Lazy imports
 const loadPapa = () => import('papaparse');
-const loadJsPDF = () => import('jspdf');
-const loadAutoTable = () => import('jspdf-autotable');
+const loadPapa = () => import('papaparse');
+const loadXLSX = () => import('xlsx'); // Добавим XLSX вместо PDF если нужно, или просто уберем лишнее
+
 
 interface TextViolation {
   id: string;
@@ -228,8 +229,8 @@ export default function TextPage() {
           >
             <Stack align="center">
               <IconFileCheck size={50} color="var(--mantine-color-blue-4)" />
-              <Text fw={500}>Поддерживаются форматы TXT, DOCX, PDF</Text>
-              <FileButton onChange={onFileUpload} accept=".txt,.docx,.pdf">
+              <Text fw={500}>Поддерживаются форматы TXT, DOCX</Text>
+              <FileButton onChange={onFileUpload} accept=".txt,.docx">
                 {(props) => (
                   <Button 
                     {...props} 
@@ -261,18 +262,6 @@ export default function TextPage() {
                     aria-label="Экспорт в CSV"
                   >
                     CSV
-                  </Button>
-                </Tooltip>
-                <Tooltip label="Скачать отчет в формате PDF" withArrow>
-                  <Button
-                    leftSection={<IconFileTypePdf size={16}/>}
-                    variant="light"
-                    color="red"
-                    onClick={exportPDF}
-                    size="xs"
-                    aria-label="Экспорт в PDF"
-                  >
-                    PDF
                   </Button>
                 </Tooltip>
                 <Tooltip label="Процент соответствия нормам русского языка" withArrow>
