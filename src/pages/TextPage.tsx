@@ -15,7 +15,7 @@ import {
   Tabs, FileButton, List, ThemeIcon, Pagination, Tooltip, Box 
 } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
-import { IconFileText, IconTypography, IconAlertCircle, IconCheck, IconFileCheck, IconFileSpreadsheet, IconFileTypePdf } from '@tabler/icons-react';
+import { IconFileText, IconTypography, IconAlertCircle, IconCheck, IconFileCheck, IconFileSpreadsheet } from '@tabler/icons-react';
 import axios from 'axios';
 import { notifications } from '@mantine/notifications';
 import apiClient from '../api/client';
@@ -25,8 +25,6 @@ import { translateViolationType } from '../utils/translations';
 
 // Lazy imports
 const loadPapa = () => import('papaparse');
-const loadPapa = () => import('papaparse');
-const loadXLSX = () => import('xlsx'); // Добавим XLSX вместо PDF если нужно, или просто уберем лишнее
 
 
 interface TextViolation {
