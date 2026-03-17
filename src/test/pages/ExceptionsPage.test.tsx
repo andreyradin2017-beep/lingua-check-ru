@@ -16,7 +16,7 @@ vi.mock('axios', () => {
     get: vi.fn(() => Promise.resolve({ data: [] })),
     post: vi.fn(() => Promise.resolve({ data: { id: '1', word: 'test', created_at: '2026-03-13' } })),
     delete: vi.fn(() => Promise.resolve({})),
-    create: vi.fn(function() { return this; }),
+    create: vi.fn(function(this: any) { return this; }),
     interceptors: {
       request: { use: vi.fn(), eject: vi.fn() },
       response: { use: vi.fn(), eject: vi.fn() },

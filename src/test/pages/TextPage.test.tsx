@@ -15,7 +15,7 @@ vi.mock('axios', () => {
   const mock = {
     get: vi.fn(() => Promise.resolve({ data: { summary: { total_tokens: 0, violations_count: 0, compliance_percent: 100 }, violations: [] } })),
     post: vi.fn(() => Promise.resolve({ data: { summary: { total_tokens: 0, violations_count: 0, compliance_percent: 100 }, violations: [] } })),
-    create: vi.fn(function() { return this; }),
+    create: vi.fn(function(this: any) { return this; }),
     interceptors: {
       request: { use: vi.fn(), eject: vi.fn() },
       response: { use: vi.fn(), eject: vi.fn() },

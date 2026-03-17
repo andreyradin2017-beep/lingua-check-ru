@@ -21,7 +21,7 @@ vi.mock('axios', () => {
         ],
       }
     })),
-    create: vi.fn(function() { return this; }),
+    create: vi.fn(function(this: any) { return this; }),
     interceptors: {
       request: { use: vi.fn(), eject: vi.fn() },
       response: { use: vi.fn(), eject: vi.fn() },
