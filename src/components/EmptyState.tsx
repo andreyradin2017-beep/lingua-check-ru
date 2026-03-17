@@ -1,5 +1,5 @@
 import { Stack, Text, Center, Box, Paper } from '@mantine/core';
-import { ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 interface EmptyStateProps {
   icon: ReactNode;
