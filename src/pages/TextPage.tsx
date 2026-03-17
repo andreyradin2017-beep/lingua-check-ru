@@ -134,41 +134,6 @@ export default function TextPage() {
     }
   }, [result]);
 
-  // Экспорт PDF (lazy loading)
-  const exportPDF = useCallback(async () => {
-    if (!result) return;
-    try {
-      const jsPDFModule = await loadJsPDF();
-      const autoTableModule = await loadAutoTable();
-      const jsPDF = jsPDFModule.default;
-
-      const doc = new jsPDF();
-      doc.text(`Отчет о проверке текста`, 14, 15);
-
-      const tableData = result.violations.map((v: TextViolation) => [
-        translateViolationType(v.type),
-        v.word || 'N/A',
-        v.text_context.substring(0, 50) + (v.text_context.length > 50 ? '...' : '')
-      ]);
-
-      autoTableModule.default(doc, {
-        head: [['Тип', 'Слово', 'Контекст']],
-        body: tableData,
-        startY: 20,
-      });
-
-      doc.save('text_check_results.pdf');
-      notifications.show({
-        title: 'Экспорт PDF',
-        message: 'Документ успешно сформирован и загружен',
-        color: 'green',
-        icon: <IconCheck size={16} />
-      });
-    } catch (err) {
-      notifications.show({ title: 'Ошибка экспорта', message: String(err), color: 'red' });
-    }
-  }, [result]);
-
   const textLength = text.length;
 
   return (
