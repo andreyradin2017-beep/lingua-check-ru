@@ -19,58 +19,21 @@ async def client():
         yield ac
 
 
-@pytest.fixture
-def mock_supabase():
-    """
-    Полностью мокированный Supabase клиент
-    
-    Использование:
-        async def test_something(client, mock_supabase):
-            with patch('app.supabase_client.get_async_supabase', return_value=mock_supabase):
-                # тест
-    """
-    client = MagicMock()
-    
-    # Создаем мок ответа
-    mock_response = MagicMock()
-    mock_response.data = []
-    mock_response.count = 0
-    
-    # Создаем mock для table() с поддержкой цепочек
-    table_mock = MagicMock()
-    table_mock.select.return_value = table_mock
-    table_mock.insert.return_value = table_mock
-    table_mock.delete.return_value = table_mock
-    table_mock.update.return_value = table_mock
-    table_mock.eq.return_value = table_mock
-    table_mock.neq.return_value = table_mock
-    table_mock.in_.return_value = table_mock
-    table_mock.like.return_value = table_mock
-    table_mock.limit.return_value = table_mock
-    table_mock.order.return_value = table_mock
-    table_mock.execute = AsyncMock(return_value=mock_response)
-    
-    client.table.return_value = table_mock
-    
-    return client
-
-
 class TestTrademarksAPI:
     """Тесты для API брендов"""
 
     @pytest.mark.asyncio
-    async def test_get_trademarks_empty(self, client, mock_supabase):
+    async def test_get_trademarks_empty(self, client, mock_supabase_client):
         """Получение пустого списка брендов"""
-        mock_supabase.table.return_value.select.return_value.execute.return_value.data = []
+        mock_supabase_client.table.return_value.select.return_value.execute.return_value.data = []
         
-        with patch('app.supabase_client.get_async_supabase', return_value=mock_supabase):
-            response = await client.get("/api/v1/trademarks")
+        response = await client.get("/api/v1/trademarks")
         
         assert response.status_code == 200
         assert isinstance(response.json(), list)
 
     @pytest.mark.asyncio
-    async def test_create_trademark(self, client, mock_supabase):
+    async def test_create_trademark(self, client, mock_supabase_client):
         """Создание нового бренда"""
         trademark_data = {
             "id": "test-id-123",
@@ -80,14 +43,13 @@ class TestTrademarksAPI:
         }
         
         # Мокируем проверку на дубликат (пусто) и успешное создание
-        mock_supabase.table.return_value.select.return_value.execute.return_value.data = []
-        mock_supabase.table.return_value.insert.return_value.execute.return_value.data = [trademark_data]
+        mock_supabase_client.table.return_value.select.return_value.execute.return_value.data = []
+        mock_supabase_client.table.return_value.insert.return_value.execute.return_value.data = [trademark_data]
         
-        with patch('app.supabase_client.get_async_supabase', return_value=mock_supabase):
-            response = await client.post(
-                "/api/v1/trademarks",
-                json={"word": "TestBrand"}
-            )
+        response = await client.post(
+            "/api/v1/trademarks",
+            json={"word": "TestBrand"}
+        )
         
         assert response.status_code in [200, 201]
         data = response.json()
@@ -96,18 +58,17 @@ class TestTrademarksAPI:
         assert "id" in data
 
     @pytest.mark.asyncio
-    async def test_create_duplicate_trademark(self, client, mock_supabase):
+    async def test_create_duplicate_trademark(self, client, mock_supabase_client):
         """Попытка создания дубликата бренда"""
         # Мокируем существующий бренд
-        mock_supabase.table.return_value.select.return_value.execute.return_value.data = [
+        mock_supabase_client.table.return_value.select.return_value.execute.return_value.data = [
             {"id": "existing-id", "normal_form": "duplicatebrand"}
         ]
         
-        with patch('app.supabase_client.get_async_supabase', return_value=mock_supabase):
-            response = await client.post(
-                "/api/v1/trademarks",
-                json={"word": "DuplicateBrand"}
-            )
+        response = await client.post(
+            "/api/v1/trademarks",
+            json={"word": "DuplicateBrand"}
+        )
         
         assert response.status_code == 400
         assert "уже зарегистрирован" in response.json()["detail"]
@@ -123,28 +84,26 @@ class TestTrademarksAPI:
         assert response.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_delete_trademark(self, client, mock_supabase):
+    async def test_delete_trademark(self, client, mock_supabase_client):
         """Удаление бренда"""
         trademark_id = "test-trademark-123"
         
         # Мокируем успешное удаление
-        mock_supabase.table.return_value.delete.return_value.eq.return_value.execute.return_value.data = [
+        mock_supabase_client.table.return_value.delete.return_value.eq.return_value.execute.return_value.data = [
             {"id": trademark_id}
         ]
         
-        with patch('app.supabase_client.get_async_supabase', return_value=mock_supabase):
-            delete_response = await client.delete(f"/api/v1/trademarks/{trademark_id}")
+        delete_response = await client.delete(f"/api/v1/trademarks/{trademark_id}")
         
         assert delete_response.status_code == 204
 
     @pytest.mark.asyncio
-    async def test_delete_nonexistent_trademark(self, client, mock_supabase):
+    async def test_delete_nonexistent_trademark(self, client, mock_supabase_client):
         """Удаление несуществующего бренда"""
         # Мокируем отсутствие бренда
-        mock_supabase.table.return_value.delete.return_value.eq.return_value.execute.return_value.data = []
+        mock_supabase_client.table.return_value.delete.return_value.eq.return_value.execute.return_value.data = []
         
-        with patch('app.supabase_client.get_async_supabase', return_value=mock_supabase):
-            response = await client.delete("/api/v1/trademarks/nonexistent-id")
+        response = await client.delete("/api/v1/trademarks/nonexistent-id")
         
         assert response.status_code == 404
 
@@ -153,18 +112,17 @@ class TestExceptionsAPI:
     """Тесты для API глобальных исключений"""
 
     @pytest.mark.asyncio
-    async def test_get_exceptions_empty(self, client, mock_supabase):
+    async def test_get_exceptions_empty(self, client, mock_supabase_client):
         """Получение пустого списка исключений"""
-        mock_supabase.table.return_value.select.return_value.execute.return_value.data = []
+        mock_supabase_client.table.return_value.select.return_value.execute.return_value.data = []
         
-        with patch('app.supabase_client.get_async_supabase', return_value=mock_supabase):
-            response = await client.get("/api/v1/exceptions")
+        response = await client.get("/api/v1/exceptions")
         
         assert response.status_code == 200
         assert isinstance(response.json(), list)
 
     @pytest.mark.asyncio
-    async def test_create_exception(self, client, mock_supabase):
+    async def test_create_exception(self, client, mock_supabase_client):
         """Создание нового исключения"""
         exception_data = {
             "id": "test-id-123",
@@ -173,14 +131,13 @@ class TestExceptionsAPI:
         }
         
         # Мокируем проверку на дубликат (пусто) и успешное создание
-        mock_supabase.table.return_value.select.return_value.execute.return_value.data = []
-        mock_supabase.table.return_value.insert.return_value.execute.return_value.data = [exception_data]
+        mock_supabase_client.table.return_value.select.return_value.execute.return_value.data = []
+        mock_supabase_client.table.return_value.insert.return_value.execute.return_value.data = [exception_data]
         
-        with patch('app.supabase_client.get_async_supabase', return_value=mock_supabase):
-            response = await client.post(
-                "/api/v1/exceptions",
-                json={"word": "testexception"}
-            )
+        response = await client.post(
+            "/api/v1/exceptions",
+            json={"word": "testexception"}
+        )
         
         assert response.status_code == 200
         data = response.json()
@@ -188,33 +145,31 @@ class TestExceptionsAPI:
         assert "id" in data
 
     @pytest.mark.asyncio
-    async def test_create_duplicate_exception(self, client, mock_supabase):
+    async def test_create_duplicate_exception(self, client, mock_supabase_client):
         """Попытка создания дубликата исключения"""
         # Мокируем существующее исключение
-        mock_supabase.table.return_value.select.return_value.execute.return_value.data = [
+        mock_supabase_client.table.return_value.select.return_value.execute.return_value.data = [
             {"id": "existing-id", "word": "uniqueexception"}
         ]
         
-        with patch('app.supabase_client.get_async_supabase', return_value=mock_supabase):
-            response = await client.post(
-                "/api/v1/exceptions",
-                json={"word": "uniqueexception"}
-            )
+        response = await client.post(
+            "/api/v1/exceptions",
+            json={"word": "uniqueexception"}
+        )
         
         assert response.status_code == 400
 
     @pytest.mark.asyncio
-    async def test_delete_exception(self, client, mock_supabase):
+    async def test_delete_exception(self, client, mock_supabase_client):
         """Удаление исключения"""
         exception_id = "test-exception-123"
         
         # Мокируем успешное удаление
-        mock_supabase.table.return_value.delete.return_value.eq.return_value.execute.return_value.data = [
+        mock_supabase_client.table.return_value.delete.return_value.eq.return_value.execute.return_value.data = [
             {"id": exception_id}
         ]
         
-        with patch('app.supabase_client.get_async_supabase', return_value=mock_supabase):
-            delete_response = await client.delete(f"/api/v1/exceptions/{exception_id}")
+        delete_response = await client.delete(f"/api/v1/exceptions/{exception_id}")
         
         assert delete_response.status_code in [200, 204]
 
@@ -241,34 +196,31 @@ class TestScanAPI:
         assert response.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_get_nonexistent_scan(self, client, mock_supabase):
+    async def test_get_nonexistent_scan(self, client, mock_supabase_client):
         """Получение несуществующего скана"""
-        mock_supabase.table.return_value.select.return_value.execute.return_value.data = []
+        mock_supabase_client.table.return_value.select.return_value.execute.return_value.data = []
         
-        with patch('app.supabase_client.get_async_supabase', return_value=mock_supabase):
-            response = await client.get("/api/v1/scan/nonexistent-id")
+        response = await client.get("/api/v1/scan/nonexistent-id")
         
         assert response.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_get_scans_list(self, client, mock_supabase):
+    async def test_get_scans_list(self, client, mock_supabase_client):
         """Получение списка сканов"""
-        mock_supabase.table.return_value.select.return_value.execute.return_value.data = []
+        mock_supabase_client.table.return_value.select.return_value.execute.return_value.data = []
         
-        with patch('app.supabase_client.get_async_supabase', return_value=mock_supabase):
-            response = await client.get("/api/v1/scans")
+        response = await client.get("/api/v1/scans")
         
         assert response.status_code == 200
         assert isinstance(response.json(), list)
 
     @pytest.mark.asyncio
-    async def test_delete_nonexistent_scan(self, client, mock_supabase):
+    async def test_delete_nonexistent_scan(self, client, mock_supabase_client):
         """Удаление несуществующего скана"""
         # API возвращает 404 или 500
-        mock_supabase.table.return_value.select.return_value.execute.return_value.data = []
+        mock_supabase_client.table.return_value.select.return_value.execute.return_value.data = []
         
-        with patch('app.supabase_client.get_async_supabase', return_value=mock_supabase):
-            response = await client.delete("/api/v1/scan/nonexistent-id")
+        response = await client.delete("/api/v1/scan/nonexistent-id")
         
         assert response.status_code in [404, 500]
 
@@ -286,15 +238,14 @@ class TestTextCheckAPI:
         assert response.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_check_text_simple(self, client, mock_supabase):
+    async def test_check_text_simple(self, client, mock_supabase_client):
         """Проверка простого текста"""
-        mock_supabase.table.return_value.select.return_value.execute.return_value.data = []
+        mock_supabase_client.table.return_value.select.return_value.execute.return_value.data = []
         
-        with patch('app.supabase_client.get_async_supabase', return_value=mock_supabase):
-            response = await client.post(
-                "/api/v1/check_text",
-                json={"text": "Простой текст на русском языке", "format": "plain"}
-            )
+        response = await client.post(
+            "/api/v1/check_text",
+            json={"text": "Простой текст на русском языке", "format": "plain"}
+        )
         
         assert response.status_code == 200
         data = response.json()
@@ -306,12 +257,11 @@ class TestHealthAPI:
     """Тесты для API здоровья"""
 
     @pytest.mark.asyncio
-    async def test_health_check(self, client, mock_supabase):
+    async def test_health_check(self, client, mock_supabase_client):
         """Проверка health endpoint"""
-        mock_supabase.table.return_value.select.return_value.execute.return_value.data = []
+        mock_supabase_client.table.return_value.select.return_value.execute.return_value.data = []
         
-        with patch('app.supabase_client.get_async_supabase', return_value=mock_supabase):
-            response = await client.get("/api/v1/health")
+        response = await client.get("/api/v1/health")
         
         assert response.status_code == 200
         data = response.json()

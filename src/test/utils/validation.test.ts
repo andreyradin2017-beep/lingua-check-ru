@@ -63,7 +63,7 @@ describe('validation', () => {
       expect(isValidUrl('example.com')).toBe(false);
       expect(isValidUrl('ftp://example.com')).toBe(false);
       expect(isValidUrl('')).toBe(false);
-      expect(isValidUrl(null as any)).toBe(false);
+      expect(isValidUrl(null as unknown as string)).toBe(false);
     });
   });
 });

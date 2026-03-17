@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Title, Stack, Table, Badge, Paper, Text, Button, Group, ActionIcon, Modal, Center, Tooltip, Pagination, Skeleton, Box } from '@mantine/core';
+import { Title, Stack, Table, Badge, Paper, Text, Button, Group, ActionIcon, Modal, Tooltip, Pagination, Skeleton, Box } from '@mantine/core';
 import { IconTrash, IconHistory, IconFileAnalytics, IconPlayerStop, IconSearch, IconAdjustmentsHorizontal, IconAlertTriangle, IconPlayerPlay } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -8,6 +8,7 @@ import apiClient from '../api/client';
 import { notifications } from '@mantine/notifications';
 import { useDisclosure } from '@mantine/hooks';
 import { translateScanStatus, getScanStatusColor } from '../utils/translations';
+import { EmptyState } from '../components/EmptyState';
 
 interface ScanHistoryItem {
   id: string;
@@ -149,7 +150,7 @@ export default function HistoryPage() {
         <title>История проверок — LinguaCheck RU</title>
       </Helmet>
 
-      <Stack gap="xl">
+      <Stack gap="xl" className="page-transition">
         <Group justify="space-between" align="flex-end">
           <Stack gap={0}>
             <Title order={2} size={32} fw={900}>История проверок</Title>
@@ -195,22 +196,41 @@ export default function HistoryPage() {
 
         <Paper radius="lg" withBorder p="lg">
           {loading && scans.length === 0 ? (
-            <Stack p="xl" gap="md">
-              <Skeleton height={20} radius="md" />
-              <Skeleton height={60} radius="md" />
-              <Skeleton height={60} radius="md" />
-              <Skeleton height={60} radius="md" />
-              <Skeleton height={60} radius="md" />
-              <Skeleton height={20} radius="md" />
+            <Stack gap={0}>
+              {/* Заголовок таблицы - скелетон */}
+              <Group px="xl" py="md" style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}>
+                <Skeleton height={14} width="15%" />
+                <Skeleton height={14} width="40%" />
+                <Skeleton height={14} width="15%" />
+                <Skeleton height={14} width="10%" ml="auto" />
+              </Group>
+              {/* Строки таблицы - скелетон */}
+              {[...Array(5)].map((_, i) => (
+                <Group key={i} px="xl" py="lg" style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}>
+                  <Skeleton height={16} width="12%" />
+                  <Group gap="sm" style={{ width: '40%' }}>
+                    <Skeleton height={20} width={20} circle />
+                    <Skeleton height={16} width="70%" />
+                  </Group>
+                  <Skeleton height={24} width="12%" radius="xl" />
+                  <Group gap="sm" ml="auto">
+                    <Skeleton height={28} width={28} radius="xl" />
+                    <Skeleton height={28} width={28} radius="xl" />
+                  </Group>
+                </Group>
+              ))}
             </Stack>
           ) : scans.length === 0 ? (
-            <Center p={100}>
-              <Stack align="center">
-                <IconHistory size={80} style={{ color: 'var(--mantine-color-dimmed)' }} />
-                <Text c="dimmed" size="lg">История пока пуста</Text>
-                <Button variant="light" onClick={() => navigate('/scans')}>Запустить первую проверку</Button>
-              </Stack>
-            </Center>
+            <EmptyState 
+              icon={<IconHistory size={60} stroke={1.5} />}
+              title="История проверок пуста"
+              description="Вы еще не запускали анализ сайтов. Как только вы проверите первый ресурс, отчет появится на этой странице."
+              action={
+                <Button variant="outline" size="md" onClick={() => navigate('/scans')}>
+                  Начать первую проверку
+                </Button>
+              }
+            />
           ) : (
             <>
               <Box style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>

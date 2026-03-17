@@ -33,7 +33,7 @@ const updateLastResponseTime = () => {
   lastResponseTime = Date.now();
   try {
     localStorage.setItem(STORAGE_KEY, lastResponseTime.toString());
-  } catch (e) {
+  } catch {
     // Игнорируем ошибки квоты или приватного режима
   }
 };

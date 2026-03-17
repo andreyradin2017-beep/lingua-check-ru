@@ -65,6 +65,7 @@ class ScanSummary(BaseModel):
     pages_with_violations: int = 0
     total_violations: int = 0
     pending_pages: int = 0
+    total_discovered: int = 0  # Кол-во URL найденных в sitemap + краулером
 
 
 class ScanStatusResponse(BaseModel):

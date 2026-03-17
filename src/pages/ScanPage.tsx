@@ -18,7 +18,7 @@ import {
 import { useDebouncedValue } from '@mantine/hooks';
 import {
   IconSearch, IconAlertTriangle, IconCheck, IconFileSpreadsheet,
-  IconFileTypePdf, IconFilter, IconBookmark, IconShieldCheck, IconInfoCircle
+  IconFilter, IconBookmark, IconShieldCheck, IconInfoCircle
 } from '@tabler/icons-react';
 import { useSearchParams } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
@@ -58,6 +58,7 @@ interface ScanResult {
     pages_with_violations: number;
     total_violations: number;
     pending_pages?: number;
+    total_discovered?: number; // Кол-во URL найденных в sitemap
   };
   pages: Page[];
   violations: Violation[];
@@ -458,7 +459,7 @@ export default function ScanPage() {
     } finally {
       setLoading(false);
     }
-  }, [url, depth, maxPages, checkStatus]);
+  }, [url, depth, maxPages, setSearchParams]);
 
   // Остановка сканирования
   const handleStopScan = useCallback(async () => {
@@ -610,41 +611,6 @@ export default function ScanPage() {
     }
   }, [result, filteredViolations]);
 
-  // Экспорт в PDF (lazy loading)
-  const exportPDF = useCallback(async () => {
-    if (!result || filteredViolations.length === 0) return;
-
-    try {
-      const jsPDFModule = await import('jspdf');
-      const autoTableModule = await import('jspdf-autotable');
-      const jsPDF = jsPDFModule.default;
-
-      const doc = new jsPDF();
-      doc.text(`Отчет о нарушениях: ${url}`, 14, 15);
-
-      const tableData = filteredViolations.map(v => [
-        translateType(v.type),
-        v.word || 'N/A',
-        v.page_url || ''
-      ]);
-
-      autoTableModule.default(doc, {
-        head: [['Тип', 'Слово', 'URL страницы']],
-        body: tableData,
-        startY: 20,
-        styles: { fontSize: 8, cellPadding: 2 },
-      });
-
-      doc.save(`linguacheck_violations_${new Date().toISOString().slice(0, 10)}.pdf`);
-      notifications.show({
-        title: 'Экспорт PDF',
-        message: 'Документ успешно сформирован и загружен',
-        color: 'green'
-      });
-    } catch (err) {
-      notifications.show({ title: 'Ошибка экспорта', message: String(err), color: 'red' });
-    }
-  }, [result, filteredViolations, url]);
 
   // Обработчики фильтров
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -669,10 +635,10 @@ export default function ScanPage() {
     if (!result?.summary) return 0;
     const total = result.summary.total_pages + (result.summary.pending_pages || 0);
     return total > 0 ? (result.summary.total_pages / Number(maxPages) * 100) : 5;
-  }, [result?.summary, result?.summary.pending_pages, maxPages]);
+  }, [result?.summary, maxPages]);
 
   return (
-    <Stack gap="xl">
+    <Stack gap="xl" className="page-transition">
       <Helmet>
         <title>Сканирование сайтов — LinguaCheck RU</title>
         <meta name="description" content="Глубокий анализ сайтов на соответствие нормам русского языка и ФЗ №168-ФЗ." />
@@ -690,11 +656,7 @@ export default function ScanPage() {
             p="xl" 
             radius="lg" 
             withBorder
-            style={{ 
-              background: 'rgba(255, 255, 255, 0.05)', 
-              backdropFilter: 'blur(10px)',
-              border: '1px solid rgba(255, 255, 255, 0.1)'
-            }}
+            className="scan-form-paper"
             role="form" 
             aria-label="Форма сканирования сайта"
           >
@@ -729,7 +691,10 @@ export default function ScanPage() {
                       if (val === 0) setMaxPages(1);
                     }}
                     rightSection={
-                      <Tooltip label="Количество уровней вложенности ссылок (0-5)" withArrow>
+                      <Tooltip 
+                        label="Уровень вложенности ссылок (0-5). Если указать 0, будет просканирована только одна исходная страница." 
+                        withArrow
+                      >
                         <IconInfoCircle size={18} style={{ color: 'var(--mantine-color-dimmed)', cursor: 'help' }} />
                       </Tooltip>
                     }
@@ -744,7 +709,10 @@ export default function ScanPage() {
                     value={maxPages}
                     onChange={(val) => setMaxPages(val)}
                     rightSection={
-                      <Tooltip label="Максимальное количество страниц (до 1000)" withArrow>
+                      <Tooltip 
+                        label="Максимальное количество страниц для обхода (до 1000). В первую очередь проверяются страницы, найденные в sitemap.xml." 
+                        withArrow
+                      >
                         <IconInfoCircle size={18} style={{ color: 'var(--mantine-color-dimmed)', cursor: 'help' }} />
                       </Tooltip>
                     }
@@ -807,16 +775,6 @@ export default function ScanPage() {
                   >
                     XLSX
                   </Button>
-                  <Button 
-                    leftSection={<IconFileTypePdf size={16}/>} 
-                    variant="light" 
-                    color="red" 
-                    radius="md" 
-                    onClick={exportPDF}
-                    aria-label="Экспорт в PDF"
-                  >
-                    PDF
-                  </Button>
                 </Group>
               </Group>
 
@@ -860,7 +818,12 @@ export default function ScanPage() {
                            'Идет активное сканирование...'}
                         </Text>
                         <Text size="sm" c="dimmed">
-                          Обработано {result.summary.total_pages} из {maxPages} ({progressValue.toFixed(0)}%)
+                          Обработано {result.summary.total_pages} стр.
+                          {result.summary.total_discovered 
+                            ? ` из ${result.summary.total_discovered} найденных в sitemap` 
+                            : ` (лимит: ${maxPages})`
+                          }
+                          {' '}({progressValue.toFixed(0)}%)
                         </Text>
                       </Stack>
                       <Group gap="xs">
@@ -958,46 +921,88 @@ export default function ScanPage() {
                   ) : (
                     <Box
                       style={{
-                        overflowX: 'auto',
-                        maxWidth: '100%',
                         border: '1px solid var(--mantine-color-default-border)',
-                        borderRadius: 'var(--mantine-radius-md)'
+                        borderRadius: 'var(--mantine-radius-md)',
+                        overflow: 'hidden',
                       }}
                       role="region"
                       aria-label="Таблица нарушений"
                     >
-                      <Table
-                        highlightOnHover
-                        verticalSpacing="md"
-                        stickyHeader
-                      >
-                        <Table.Thead>
-                          <Table.Tr>
-                            <Table.Th style={{ minWidth: 150, maxWidth: 250 }}>Слово</Table.Th>
-                            <Table.Th style={{ minWidth: 180, maxWidth: 220 }}>Тип нарушения</Table.Th>
-                            <Table.Th style={{ minWidth: 300 }}>Страница</Table.Th>
-                            <Table.Th style={{ width: 120, minWidth: 120 }} ta="right">Действия</Table.Th>
-                          </Table.Tr>
-                        </Table.Thead>
-                        <Table.Tbody>
-                          {paginatedGrouped.map((v) => (
-                            <ViolationRow
-                              key={v.id}
-                              violation={v}
-                              onAddTrademark={addTrademark}
-                              onAddException={addException}
-                              translateType={translateType}
-                              getTypeColor={getTypeColor}
-                            />
-                          ))}
-                        </Table.Tbody>
-                      </Table>
+                      {/* Десктоп: таблица */}
+                      <Box className="violations-table-desktop" style={{ overflowX: 'auto' }}>
+                        <Table highlightOnHover verticalSpacing="md" stickyHeader>
+                          <Table.Thead>
+                            <Table.Tr>
+                              <Table.Th style={{ minWidth: 150, maxWidth: 250 }}>Слово</Table.Th>
+                              <Table.Th style={{ minWidth: 180, maxWidth: 220 }}>Тип нарушения</Table.Th>
+                              <Table.Th style={{ minWidth: 300 }}>Страница</Table.Th>
+                              <Table.Th style={{ width: 120, minWidth: 120 }} ta="right">Действия</Table.Th>
+                            </Table.Tr>
+                          </Table.Thead>
+                          <Table.Tbody>
+                            {paginatedGrouped.map((v) => (
+                              <ViolationRow
+                                key={v.id}
+                                violation={v}
+                                onAddTrademark={addTrademark}
+                                onAddException={addException}
+                                translateType={translateType}
+                                getTypeColor={getTypeColor}
+                              />
+                            ))}
+                          </Table.Tbody>
+                        </Table>
+                      </Box>
+
+                      {/* Мобильный: карточки */}
+                      {paginatedGrouped.map((v) => (
+                        <div key={`mobile-${v.id}`} className="violation-card-mobile">
+                          <div className="violation-card-label">Слово</div>
+                          <div className="violation-card-value" style={{ fontWeight: 700 }}>
+                            {v.word || 'N/A'}
+                            {v.count > 1 && (
+                              <Badge size="xs" ml={6} variant="light" color="orange">×{v.count}</Badge>
+                            )}
+                          </div>
+                          <div className="violation-card-label">Тип</div>
+                          <div className="violation-card-value">
+                            <Badge color={getTypeColor(v.type)} variant="light" radius="sm" size="sm">
+                              {translateType(v.type)}
+                            </Badge>
+                          </div>
+                          <div className="violation-card-label">Страница</div>
+                          <div className="violation-card-value">
+                            <Text
+                              size="xs"
+                              c="blue"
+                              style={{ cursor: 'pointer', wordBreak: 'break-all' }}
+                              onClick={() => v.page_url && window.open(v.page_url, '_blank', 'noopener,noreferrer')}
+                            >
+                              {v.page_url
+                                ? (v.page_url.length > 55 ? `${v.page_url.substring(0, 55)}...` : v.page_url)
+                                : 'N/A'}
+                            </Text>
+                          </div>
+                          <div className="violation-card-actions">
+                            <Tooltip label="Добавить в бренды" withArrow>
+                              <ActionIcon variant="light" size="sm" onClick={() => addTrademark(v.word || v.normal_form || '')}>
+                                <IconBookmark size={14} />
+                              </ActionIcon>
+                            </Tooltip>
+                            <Tooltip label="Добавить в исключения" withArrow>
+                              <ActionIcon variant="light" color="green" size="sm" onClick={() => addException(v.word || v.normal_form || '')}>
+                                <IconShieldCheck size={14} />
+                              </ActionIcon>
+                            </Tooltip>
+                          </div>
+                        </div>
+                      ))}
 
                       {filteredGrouped.length > ITEMS_PER_PAGE && (
-                        <Group justify="center" mt="xl">
-                          <Pagination 
-                            total={Math.ceil(filteredGrouped.length / ITEMS_PER_PAGE)} 
-                            value={activePage} 
+                        <Group justify="center" mt="xl" pb="md">
+                          <Pagination
+                            total={Math.ceil(filteredGrouped.length / ITEMS_PER_PAGE)}
+                            value={activePage}
                             onChange={setPage}
                             aria-label="Пагинация результатов"
                           />

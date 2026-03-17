@@ -14,7 +14,7 @@ export default function HomePage() {
         <meta name="description" content="Автоматизированная проверка сайтов и документов на соответствие ФЗ №168-ФЗ о государственном языке РФ." />
       </Helmet>
 
-      <Container size="xl">
+      <Container size="xl" className="page-transition">
         <Stack gap={40}>
           {/* Enhanced Hero Section */}
           <Box

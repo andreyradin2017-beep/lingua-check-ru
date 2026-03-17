@@ -217,6 +217,7 @@ async def get_scan(
             pages_with_violations=pages_with_v,
             total_violations=len(violations),
             pending_pages=scan.get("details", {}).get("pending_pages", 0) if scan.get("details") else 0,
+            total_discovered=scan.get("details", {}).get("total_discovered", 0) if scan.get("details") else 0,
         ),
         pages=page_schemas,
         violations=violation_schemas,

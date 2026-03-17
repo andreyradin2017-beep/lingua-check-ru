@@ -3,11 +3,14 @@
 Проверка каждого функционала на стабильность
 """
 import pytest
+import os
 import asyncio
 from httpx import AsyncClient, ASGITransport
 from app.main import app
 from app.supabase_client import get_async_supabase
 
+TEST_MODE = os.getenv("TEST_MODE", "local")
+pytestmark = pytest.mark.skipif(TEST_MODE != "integration", reason="Stability tests require real database and background workers")
 
 @pytest.fixture
 async def client():

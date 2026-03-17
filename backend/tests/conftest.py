@@ -12,26 +12,26 @@ from app.main import app
 # Глубокое мокирование Supabase
 def create_new_mock_supabase():
     mock_supabase = MagicMock()
-    _tables = {}
     
-    def get_table_mock(table_name):
-        if table_name not in _tables:
-            table_mock = MagicMock()
-            mock_resp = AsyncMock()
-            mock_resp.data = []
-            mock_resp.execute = AsyncMock(return_value=mock_resp)
-            
-            table_mock.select.return_value = table_mock
-            table_mock.insert.return_value = table_mock
-            table_mock.delete.return_value = table_mock
-            table_mock.update.return_value = table_mock
-            table_mock.eq.return_value = table_mock
-            table_mock.neq.return_value = table_mock
-            table_mock.execute = mock_resp.execute
-            _tables[table_name] = table_mock
-        return _tables[table_name]
+    # Helper for creating a chained mock setup
+    def create_chained_mock():
+        m = MagicMock()
+        resp = AsyncMock()
+        resp.data = []
+        resp.count = 0
+        m.execute = AsyncMock(return_value=resp)
+        # Setup chainability
+        for attr in ["eq", "neq", "in_", "like", "limit", "order", "select"]:
+            getattr(m, attr).return_value = m
+        return m
 
-    mock_supabase.table.side_effect = get_table_mock
+    table_mock = MagicMock()
+    table_mock.select.return_value = create_chained_mock()
+    table_mock.insert.return_value = create_chained_mock()
+    table_mock.delete.return_value = create_chained_mock()
+    table_mock.update.return_value = create_chained_mock()
+
+    mock_supabase.table.return_value = table_mock
     return mock_supabase
 
 _base_mock_supabase = create_new_mock_supabase()
@@ -137,26 +137,23 @@ def mock_supabase_with_data():
     def _create_mock(data=None, count=0):
         client = MagicMock()
         
-        mock_response = AsyncMock()
-        mock_response.data = data or []
-        mock_response.count = count
-        mock_response.execute = AsyncMock(return_value=mock_response)
-        
+        def create_chained_mock():
+            m = MagicMock()
+            resp = AsyncMock()
+            resp.data = data or []
+            resp.count = count
+            m.execute = AsyncMock(return_value=resp)
+            for attr in ["eq", "neq", "in_", "like", "limit", "order", "select"]:
+                getattr(m, attr).return_value = m
+            return m
+
         table_mock = MagicMock()
-        table_mock.select.return_value = table_mock
-        table_mock.insert.return_value = table_mock
-        table_mock.delete.return_value = table_mock
-        table_mock.update.return_value = table_mock
-        table_mock.eq.return_value = table_mock
-        table_mock.neq.return_value = table_mock
-        table_mock.in_.return_value = table_mock
-        table_mock.like.return_value = table_mock
-        table_mock.limit.return_value = table_mock
-        table_mock.order.return_value = table_mock
-        table_mock.execute = mock_response.execute
+        table_mock.select.return_value = create_chained_mock()
+        table_mock.insert.return_value = create_chained_mock()
+        table_mock.delete.return_value = create_chained_mock()
+        table_mock.update.return_value = create_chained_mock()
         
         client.table.return_value = table_mock
-        
         return client
     
     return _create_mock

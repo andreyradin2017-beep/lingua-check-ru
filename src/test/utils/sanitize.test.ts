@@ -20,8 +20,8 @@ describe('sanitize', () => {
 
     it('должен обрабатывать пустые строки', () => {
       expect(sanitizeText('')).toBe('');
-      expect(sanitizeText(null as any)).toBe('');
-      expect(sanitizeText(undefined as any)).toBe('');
+      expect(sanitizeText(null as unknown as string)).toBe('');
+      expect(sanitizeText(undefined as unknown as string)).toBe('');
     });
 
     it('должен обрабатывать обычный текст без изменений', () => {
@@ -44,7 +44,7 @@ describe('sanitize', () => {
 
     it('должен обрабатывать пустые строки', () => {
       expect(stripHtmlTags('')).toBe('');
-      expect(stripHtmlTags(null as any)).toBe('');
+      expect(stripHtmlTags(null as unknown as string)).toBe('');
     });
 
     it('должен сохранять текст между тегами', () => {
@@ -100,7 +100,7 @@ describe('sanitize', () => {
 
     it('должен обрабатывать пустые строки', () => {
       expect(hasDangerousHtml('')).toBe(false);
-      expect(hasDangerousHtml(null as any)).toBe(false);
+      expect(hasDangerousHtml(null as unknown as string)).toBe(false);
     });
   });
 });

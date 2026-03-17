@@ -1,7 +1,53 @@
 :root {
   --mantine-font-family: "Inter", system-ui, sans-serif;
-  /* Улучшенный контраст для dimmed текста */
   --mantine-color-dimmed: #5c5f66;
+}
+
+/* Dark mode: высококонтрастные переменные */
+[data-mantine-color-scheme="dark"] {
+  --mantine-color-dimmed: #adb5bd;
+  --lc-surface-1: #21252b;
+  --lc-surface-0: #181b21;
+  --lc-border: rgba(255, 255, 255, 0.08);
+  --lc-text-primary: #f8f9fa;
+  --lc-text-secondary: #e9ecef;
+}
+
+/* Page Transitions */
+@keyframes fadeInSlide {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.page-transition {
+  animation: fadeInSlide 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+/* File Dropzone Hover Effects */
+.file-dropzone {
+  border: 2px dashed var(--mantine-color-default-border);
+  background-color: var(--lc-surface-1);
+  transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+  cursor: pointer;
+}
+
+[data-mantine-color-scheme="dark"] .file-dropzone {
+  background-color: rgba(255, 255, 255, 0.02) !important;
+}
+
+.file-dropzone:hover {
+  border-color: var(--mantine-color-blue-filled) !important;
+  background-color: var(--mantine-color-blue-light) !important;
+  transform: translateY(-2px);
+}
+
+/* Light mode переменные */
+[data-mantine-color-scheme="light"] {
+  --lc-surface-1: #ffffff;
+  --lc-surface-0: #f8f9fa;
+  --lc-border: rgba(0, 0, 0, 0.1);
+  --lc-text-primary: #1a1a2e;
+  --lc-text-secondary: #5c5f66;
 }
 
 body {
@@ -11,6 +57,49 @@ body {
   -moz-osx-font-smoothing: grayscale;
   margin: 0;
   line-height: 1.5;
+}
+
+/* Таблица: улучшенный контраст в dark mode */
+[data-mantine-color-scheme="dark"] .mantine-Table-tr:hover {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+}
+
+[data-mantine-color-scheme="dark"] .mantine-Table-thead {
+  background-color: rgba(255, 255, 255, 0.02) !important;
+}
+
+[data-mantine-color-scheme="dark"] .mantine-Table-table {
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+/* Paper и Card: улучшенный border в dark mode */
+[data-mantine-color-scheme="dark"] .mantine-Paper-root,
+[data-mantine-color-scheme="dark"] .mantine-Card-root {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Микроанимации для кнопок */
+.mantine-Button-root:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Стили формы сканирования (исправление светлой темы) */
+.scan-form-paper {
+  background-color: var(--lc-surface-1);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+[data-mantine-color-scheme="dark"] .scan-form-paper {
+  background: rgba(33, 37, 43, 0.6) !important;
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+[data-mantine-color-scheme="light"] .scan-form-paper {
+  background: #ffffff !important;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
 }
 
 /* Улучшенная читаемость ссылок */
@@ -24,7 +113,6 @@ a:hover {
   color: var(--mantine-color-blue-7);
 }
 
-/* Улучшенная читаемость в темной теме */
 [data-mantine-color-scheme="dark"] a {
   color: var(--mantine-color-blue-4);
 }
@@ -43,18 +131,13 @@ a:hover {
   }
 }
 
-/* Плавная прокрутка */
 html {
   scroll-behavior: smooth;
 }
 
-/* Улучшенный градиентный текст */
+/* Градиентный текст */
 .gradient-text {
-  background: linear-gradient(
-    45deg,
-    #1864ab,
-    #228be6
-  );
+  background: linear-gradient(45deg, #1864ab, #228be6);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -63,8 +146,8 @@ html {
 
 /* Улучшенные скроллбары */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -72,18 +155,73 @@ html {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--mantine-color-gray-6);
-  border-radius: 5px;
+  background: var(--mantine-color-gray-5);
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--mantine-color-gray-7);
+  background: var(--mantine-color-gray-6);
+}
+
+[data-mantine-color-scheme="dark"] ::-webkit-scrollbar-thumb {
+  background: #444c56;
+}
+
+[data-mantine-color-scheme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: #576069;
 }
 
 /* Фокус для доступности */
 *:focus-visible {
-  outline: 2px solid var(--mantine-color-blue-6);
+  outline: 2px solid var(--mantine-color-blue-5);
   outline-offset: 2px;
+}
+
+/* ======================== */
+/* Мобильный адаптив таблицы — карточки вместо строк */
+/* ======================== */
+
+/* Мобильная карточка нарушения — скрыта на десктопе */
+.violation-card-mobile {
+  display: none;
+}
+
+/* Таблица скрывается на мобильном */
+@media (max-width: 768px) {
+  .violations-table-desktop {
+    display: none;
+  }
+
+  .violation-card-mobile {
+    display: block;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--mantine-color-default-border);
+  }
+
+  .violation-card-mobile:last-child {
+    border-bottom: none;
+  }
+
+  .violation-card-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--mantine-color-dimmed);
+    margin-bottom: 2px;
+  }
+
+  .violation-card-value {
+    font-size: 14px;
+    word-break: break-word;
+    margin-bottom: 8px;
+  }
+
+  .violation-card-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
 }
 
 /* Консистентные отступы (8px grid) */

@@ -171,7 +171,7 @@ export default function TextPage() {
   const textLength = text.length;
 
   return (
-    <Stack gap="xl">
+    <Stack gap="xl" className="page-transition">
       <Helmet>
         <title>Проверка текста и файлов — LinguaCheck RU</title>
         <meta name="description" content="Анализ текстов, документов DOCX и PDF на соблюдение норм государственного языка." />
@@ -222,10 +222,7 @@ export default function TextPage() {
             p={50} 
             withBorder 
             radius="md" 
-            style={{ 
-              border: '2px dashed var(--mantine-color-default-border)', 
-              backgroundColor: 'var(--mantine-color-default-hover)' 
-            }}
+            className="file-dropzone"
             role="region"
             aria-label="Загрузка файла"
           >

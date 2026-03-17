@@ -231,20 +231,59 @@ async def _get_urls_from_sitemap(start_url: str) -> list[str]:
     return list(set(result))
 
 def _is_excluded_url(url: str) -> bool:
-    """Проверяет, должен ли URL быть исключен по языковому признаку."""
+    """Проверяет, должен ли URL быть исключен: языковые и технические паттерны."""
     parsed = urlparse(url)
     path = parsed.path.lower()
-    # Исключаем типичные языковые префиксы и пути
-    excluded_patterns = [
+    query = parsed.query.lower()
+
+    # 1. Исключаем типичные языковые префиксы
+    language_patterns = [
         r'^/(en|eng|us|uk|de|fr|es|it|ja|zh|cn)(/|$)',
         r'/(en|eng|us|uk|de|fr|es|it|ja|zh|cn)/',
         r'\.(en|eng|us|uk|de|fr|es|it|ja|zh|cn)\.',
     ]
-    for pattern in excluded_patterns:
+    for pattern in language_patterns:
         if re.search(pattern, path):
             return True
-            
-    # Также проверяем query params если нужно, но пока ограничимся путем
+
+    # 2. Технические URL-паттерны (не несут контента для проверки языка)
+    technical_path_patterns = [
+        # Фильтрация и сортировка (из xlsx-аудита нарушений)
+        r'/(filter|apply|sort)(/|$|\?)',
+        # Поиск (динамически генерируемый контент)
+        r'/search(/|$)',
+        # Корзина, оформление заказа
+        r'/(cart|checkout|order)(/|$)',
+        # Авторизация
+        r'/(login|logout|signin|signup|register|auth|oauth|sso)(/|$)',
+        # Личный кабинет
+        r'/(account|profile|dashboard|cabinet|lk)(/|$)',
+        # Ajax / API запросы
+        r'/(ajax|api|graphql|rest|rpc)(/|$)',
+        # Технические системные пути
+        r'/(admin|wp-admin|cms|backend|panel)(/|$)',
+        # Файлы ресурсов
+        r'\.(xml|json|pdf|zip|doc|xls|csv|gz|jpg|jpeg|png|gif|svg|ico|woff|woff2|ttf|eot|css|js)(\?|$)',
+        # Сервисные файловые пути
+        r'/(sitemap|robots|favicon|manifest)[\./$]',
+    ]
+    for pattern in technical_path_patterns:
+        if re.search(pattern, path):
+            return True
+
+    # 3. Технические query-параметры
+    technical_query_patterns = [
+        r'(sort|filter|order_by|currency|compare|wishlist)=',
+        r'PAGEN_\d',       # Битрикс пагинация
+        r'(page|p)=\d',     # Пагинация
+        r'session(id)?=',  # Сессионные параметры
+        r'token=',
+        r'_=\d',           # jQuery AJAX cache-bypass
+    ]
+    for pattern in technical_query_patterns:
+        if re.search(pattern, query):
+            return True
+
     return False
 
 async def _scrape_site(scan_id: str, start_url: str, max_depth: int, max_pages: int, client: any, is_resume: bool = False) -> None:
@@ -279,8 +318,15 @@ async def _scrape_site(scan_id: str, start_url: str, max_depth: int, max_pages: 
         sitemap_urls = await _get_urls_from_sitemap(start_url)
         if sitemap_urls:
             logger.info(f"Scan {scan_id}: found {len(sitemap_urls)} URLs in sitemap")
-            # Добавляем в очередь с глубиной 0 (так как мы получили их напрямую)
-            # Но при этом ограничиваем общее количество
+            # Сохраняем кол-во найденных URL в БД сразу, чтобы frontend мог показать прогресс
+            try:
+                db_client = await get_async_supabase()
+                await db_client.table("scans").update(
+                    {"details": {"total_discovered": len(sitemap_urls)}}
+                ).eq("id", scan_id).execute()
+            except Exception as e:
+                logger.warning(f"Scan {scan_id}: could not save total_discovered: {e}")
+            # Добавляем URL в очередь, ограничивая лимитом max_pages
             for url in sitemap_urls[:max_pages]:
                 queue.append((url, 0))
     else:
@@ -312,7 +358,7 @@ async def _scrape_site(scan_id: str, start_url: str, max_depth: int, max_pages: 
         except Exception as e:
             logger.error("Scan %s: failed to launch browser: %s", scan_id, e)
             raise
-        semaphore = asyncio.Semaphore(2)
+        semaphore = asyncio.Semaphore(3)  # 3 параллельных воркера (FREE Render ~512MB)
         
         async def process_page(current_url, depth):
             nonlocal pages_count

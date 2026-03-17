@@ -21,8 +21,6 @@
     "@tabler/icons-react": "^3.38.0",
     "@types/react-window": "^1.8.8",
     "axios": "^1.13.6",
-    "jspdf": "^4.2.0",
-    "jspdf-autotable": "^5.0.7",
     "lucide-react": "^0.577.0",
     "papaparse": "^5.5.3",
     "react": "^19.2.0",

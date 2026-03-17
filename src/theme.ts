@@ -1,41 +1,40 @@
 import { createTheme, type MantineColorsTuple, type MantineThemeOverride } from '@mantine/core';
 
-// Акцентный синий цвет, строгий и "государственный"
+// Акцентный синий цвет (более сочный и яркий)
 const customBlue: MantineColorsTuple = [
-  '#eef3ff',
-  '#dce4f5',
-  '#b9c7e2',
-  '#94a8cf',
-  '#748dbf',
-  '#5f7cb7',
-  '#5474b4',
-  '#44639f',
-  '#39588f',
-  '#2d4b81'
+  '#e6f2ff',
+  '#cce3ff',
+  '#99c7ff',
+  '#66abff',
+  '#3d93ff',
+  '#1f7eff',
+  '#0066ff',
+  '#0057e6',
+  '#0048cc',
+  '#0038b3'
 ];
 
-// Улучшенная темная палитра для лучшей читаемости
-const improvedDark: MantineColorsTuple = [
-  '#d9d9d9', // 0: light gray
-  '#b8b8b8', // 1: gray
-  '#9b9b9b', // 2: medium gray
-  '#7a7a7a', // 3: charcoal gray
-  '#5c5c5c', // 4: dark charcoal
-  '#4a4a4a', // 5: dark gray
-  '#3a3a3a', // 6: darker gray
-  '#2a2a2a', // 7: near black
-  '#1f1f1f', // 8: deep black
-  '#141414', // 9: pure black
+// Dark palette в стиле современного SaaS — очень глубокий сине-черный фон, белый текст
+const premiumDark: MantineColorsTuple = [
+  '#f8f9fa', // 0: текст (самый светлый — высокий контраст)
+  '#e9ecef', // 1: текст dimmed lite
+  '#ced4da', // 2: placeholder, подписи
+  '#868e96', // 3: border subtle
+  '#4a5056', // 4: border / divider
+  '#2a2f36', // 5: surface elevated (tooltip, menu)
+  '#21252b', // 6: card / paper surface
+  '#181b21', // 7: section background
+  '#121418', // 8: main body background
+  '#0b0c0f', // 9: deepest background
 ];
 
 export const theme: MantineThemeOverride = createTheme({
   primaryColor: 'blue',
   colors: {
     blue: customBlue,
-    dark: improvedDark,
+    dark: premiumDark,
   },
-  // Оптимальные тени для обеих тем
-  primaryShade: { light: 7, dark: 4 },
+  primaryShade: { light: 6, dark: 5 },
   defaultRadius: 'lg',
   fontFamily: 'Inter, system-ui, sans-serif',
   headings: {
@@ -43,9 +42,10 @@ export const theme: MantineThemeOverride = createTheme({
     fontWeight: '700',
   },
   shadows: {
-    md: '0 4px 12px rgba(0, 0, 0, 0.08)',
-    lg: '0 8px 24px rgba(0, 0, 0, 0.12)',
-    xl: '0 16px 48px rgba(0, 0, 0, 0.16)',
+    sm: '0 1px 3px rgba(0, 0, 0, 0.12)',
+    md: '0 4px 12px rgba(0, 0, 0, 0.15)',
+    lg: '0 8px 24px rgba(0, 0, 0, 0.2)',
+    xl: '0 16px 48px rgba(0, 0, 0, 0.25)',
   },
   components: {
     Button: {
@@ -55,7 +55,7 @@ export const theme: MantineThemeOverride = createTheme({
       },
       styles: {
         root: {
-          transition: 'all 0.15s ease',
+          transition: 'transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease',
         },
       },
     },
@@ -80,6 +80,7 @@ export const theme: MantineThemeOverride = createTheme({
       defaultProps: {
         radius: 'lg',
         withBorder: true,
+        shadow: 'sm',
       },
       styles: {
         root: {
@@ -115,6 +116,25 @@ export const theme: MantineThemeOverride = createTheme({
           backgroundColor: 'var(--mantine-color-body)',
           backdropFilter: 'blur(10px)',
           borderBottom: '1px solid var(--mantine-color-default-border)',
+        },
+      },
+    },
+    Badge: {
+      styles: {
+        root: {
+          fontWeight: 600,
+        },
+      },
+    },
+    Tooltip: {
+      defaultProps: {
+        withArrow: true,
+        openDelay: 400,
+        transitionProps: { transition: 'pop', duration: 150 },
+      },
+      styles: {
+        tooltip: {
+          fontSize: '13px',
         },
       },
     },
