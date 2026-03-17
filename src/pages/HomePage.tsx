@@ -91,7 +91,7 @@ export default function HomePage() {
                   </ThemeIcon>
                   <Text fw={700} size="xl">Анализ файлов</Text>
                   <Text c="dimmed" size="sm">
-                    Поддержка DOCX, PDF и TXT для быстрой корпоративной проверки документации.
+                    Поддержка DOCX и TXT для быстрой корпоративной проверки документации.
                   </Text>
                 </Stack>
               </Paper>

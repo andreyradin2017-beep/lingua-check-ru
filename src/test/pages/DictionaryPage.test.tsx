@@ -11,8 +11,8 @@ import { theme } from '../../theme';
 import DictionaryPage from '../../pages/DictionaryPage';
 
 // Mock axios
-vi.mock('axios', () => ({
-  default: {
+vi.mock('axios', () => {
+  const mock = {
     get: vi.fn(() => Promise.resolve({ 
       data: {
         dictionary_versions: [
@@ -21,8 +21,15 @@ vi.mock('axios', () => ({
         ],
       }
     })),
-  },
-}));
+    create: vi.fn(function() { return this; }),
+    interceptors: {
+      request: { use: vi.fn(), eject: vi.fn() },
+      response: { use: vi.fn(), eject: vi.fn() },
+    },
+    isAxiosError: vi.fn((err) => !!err?.isAxiosError),
+  };
+  return { default: mock };
+});
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <MemoryRouter>

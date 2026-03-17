@@ -19,7 +19,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 describe('NotFoundPage', () => {
   it('должен рендерить "404"', () => {
     render(<NotFoundPage />, { wrapper: Wrapper });
-    expect(screen.getByText('404')).toBeInTheDocument();
+    expect(screen.getAllByText('404')).toHaveLength(2);
   });
 
   it('должен показывать заголовок "Страница не найдена"', () => {

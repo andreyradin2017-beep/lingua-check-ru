@@ -23,7 +23,7 @@ export default defineConfig({
         manualChunks: {
           'vendor-react': ['react', 'react-dom', 'react-router-dom'],
           'vendor-mantine': ['@mantine/core', '@mantine/hooks', '@mantine/notifications'],
-          'vendor-utils': ['axios', 'jspdf', 'xlsx', 'papaparse'],
+          'vendor-utils': ['axios', 'xlsx', 'papaparse'],
         },
       },
     },

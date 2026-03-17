@@ -11,11 +11,19 @@ import { theme } from '../../theme';
 import TextPage from '../../pages/TextPage';
 
 // Mock axios
-vi.mock('axios', () => ({
-  default: {
+vi.mock('axios', () => {
+  const mock = {
+    get: vi.fn(() => Promise.resolve({ data: { summary: { total_tokens: 0, violations_count: 0, compliance_percent: 100 }, violations: [] } })),
     post: vi.fn(() => Promise.resolve({ data: { summary: { total_tokens: 0, violations_count: 0, compliance_percent: 100 }, violations: [] } })),
-  },
-}));
+    create: vi.fn(function() { return this; }),
+    interceptors: {
+      request: { use: vi.fn(), eject: vi.fn() },
+      response: { use: vi.fn(), eject: vi.fn() },
+    },
+    isAxiosError: vi.fn((err) => !!err?.isAxiosError),
+  };
+  return { default: mock };
+});
 
 // Mock notifications
 vi.mock('@mantine/notifications', () => ({
@@ -33,6 +41,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 describe('TextPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
   });
 
   it('должен рендерить заголовок "Проверка текста и файлов"', () => {
@@ -78,7 +87,7 @@ describe('TextPage', () => {
 
   it('должен показывать поддерживаемые форматы файлов', () => {
     render(<TextPage />, { wrapper: Wrapper });
-    expect(screen.getByText(/TXT, DOCX, PDF/i)).toBeInTheDocument();
+    expect(screen.getByText(/TXT, DOCX/i)).toBeInTheDocument();
   });
 
   it('должен рендерить кнопку выбора файла', () => {

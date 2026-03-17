@@ -2,7 +2,7 @@
  * TextPage — Страница проверки текста и файлов
  * 
  * Оптимизации:
- * - Code splitting для тяжелых библиотек (jsPDF, Papa)
+ * - Code splitting для тяжелых библиотек (Papa)
  * - Мемоизация вычислений
  * - Улучшенная доступность (a11y)
  * - Оптимизированные обработчики
@@ -138,7 +138,7 @@ export default function TextPage() {
     <Stack gap="xl" className="page-transition">
       <Helmet>
         <title>Проверка текста и файлов — LinguaCheck RU</title>
-        <meta name="description" content="Анализ текстов, документов DOCX и PDF на соблюдение норм государственного языка." />
+        <meta name="description" content="Анализ текстов и документов DOCX на соблюдение норм государственного языка." />
       </Helmet>
       
       <Stack gap={0}>
