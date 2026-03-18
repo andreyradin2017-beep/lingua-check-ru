@@ -64,6 +64,9 @@ backend/scan_debug.log
 all_e2e_tests.txt
 backend/backend_all_tests.txt
 single_test.txt
+test_screenshots/
+test_site/
+tmp/
 
 # Ensure config files and important docs are kept
 !package.json
@@ -77,4 +80,9 @@ single_test.txt
 !backend/pytest.ini
 !LICENSE*
 
+# Vercel
 .vercel
+
+# Agent and design system directories (local development only)
+.agent/
+design-system/

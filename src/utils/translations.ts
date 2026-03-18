@@ -5,7 +5,10 @@
 export type ViolationType =
   | 'foreign_word'
   | 'unrecognized_word'
-  | 'possible_trademark';
+  | 'possible_trademark'
+  | 'trademark'
+  | 'exception'
+  | 'fz152_violation';
 
 export type ScanStatus =
   | 'started'
@@ -22,6 +25,9 @@ export const translateViolationType = (type: ViolationType | string): string => 
     foreign_word: 'Иностранная лексика',
     unrecognized_word: 'Ошибки и опечатки',
     possible_trademark: 'Потенциальный бренд',
+    trademark: 'Зарегистрированный бренд',
+    exception: 'Исключение (Словарь)',
+    fz152_violation: 'Нарушение ФЗ-152',
   };
 
   return translations[type as ViolationType] || type;
@@ -50,6 +56,9 @@ export const getViolationTypeColor = (type: ViolationType | string): string => {
     foreign_word: 'red',
     unrecognized_word: 'orange',
     possible_trademark: 'blue',
+    trademark: 'green',
+    exception: 'teal',
+    fz152_violation: 'red',
   };
 
   return colors[type as ViolationType] || 'gray';
