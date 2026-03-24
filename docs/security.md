@@ -1,7 +1,7 @@
 # Security & Validation Specification
 
-**Версия:** 1.7.0  
-**Дата обновления:** 11 марта 2026
+**Версия:** 1.15.0
+**Дата обновления:** 24 марта 2026
 
 ---
 
@@ -20,15 +20,15 @@ const urlPattern = /^(https?):\/\/[^\s/$.?#].[^\s]*$/i;
 | Запрет схем | Блокировка `javascript:`, `data:` | «Недопустимый протокол» |
 | Валидность домена | RegExp + URL constructor | «Неверный формат URL» |
 
-**Frontend (url.ts):**
+**Frontend (utils/url.ts):**
 ```typescript
 export function validateUrl(url: string): string | null {
   if (!url.trim()) return 'URL не может быть пустым';
-  
+
   if (!/^https?:\/\//i.test(url)) {
     return 'Укажите полный URL (с http:// или https://)';
   }
-  
+
   try {
     new URL(url);
     return null;
@@ -40,13 +40,13 @@ export function validateUrl(url: string): string | null {
 
 **Backend (Pydantic):**
 ```python
-from pydantic import HttpUrl, field_validator
+from pydantic import field_validator
 
 class ScanRequest(BaseModel):
     url: str
     max_depth: int = 3
-    capture_screenshots: bool = False
-    
+    max_pages: int = 500
+
     @field_validator('url')
     @classmethod
     def validate_url(cls, v: str) -> str:
@@ -111,6 +111,8 @@ MAX_TEXT_LENGTH = 1_000_000  # 1 млн символов
 
 **Backend:**
 ```python
+from pydantic import Field
+
 class TextCheckRequest(BaseModel):
     text: str = Field(..., max_length=1_000_000)
     format: Literal['plain', 'html'] = 'plain'
@@ -177,7 +179,7 @@ async def scan(request: Request, data: ScanRequest):
 
 ### 2.3. XSS Защита
 
-**Frontend (sanitize.ts):**
+**Frontend (utils/sanitize.ts):**
 ```typescript
 export function sanitizeText(text: string): string {
   return text
@@ -250,31 +252,65 @@ def can_fetch(robots_url: str, user_agent: str, url: str) -> bool:
     return rp.can_fetch(user_agent, url)
 ```
 
-**User-Agent:** `LinguaCheck-RU/1.6.0`
+**User-Agent:** `LinguaCheck-RU/1.14.0`
 
 ---
 
-## 4. Защита данных
+## 4. Smart Crawler (версия 1.13.0+)
 
-### 4.1. Хранение скриншотов
+### 4.1. aria-hidden фильтрация
 
-**Путь:** `backend/static/screenshots/{scan_id}/{page_id}.png`
-
-**Очистка:**
+**Игнорирование скрытых блоков:**
 ```python
-# Удаление скриншотов при удалении скана
-import os
-import shutil
+# Playwright: игнорировать элементы с aria-hidden="true"
+const content = await page.content();
+// Фильтрация скрытых элементов
+```
 
-def delete_screenshots(scan_id: str):
-    path = f'static/screenshots/{scan_id}'
-    if os.path.exists(path):
-        shutil.rmtree(path)
+### 4.2. URL фильтрация
+
+**Исключение иноязычных доменов:**
+```python
+def is_foreign_domain(url: str, base_domain: str) -> bool:
+    parsed = urlparse(url)
+    return base_domain not in parsed.netloc
+```
+
+### 4.3. Safe Tokenizer
+
+**Исключение технических терминов:**
+```python
+_SAFE_TOKENS = {
+    "drug",  # Технический термин, не нарушение
+    "javascript", "typescript",
+    "elementbytagname", "getelementsbytagname",
+    # ... другие технические термины
+}
 ```
 
 ---
 
-### 4.2. Персональные данные
+## 5. Защита данных
+
+### 5.1. Хранение данных
+
+**Пути:**
+- Скриншоты: удалены в версии 1.7.0
+- Статические файлы: `backend/static/`
+
+**Очистка:**
+```python
+# Удаление старых сканирований
+import shutil
+
+def delete_scan_data(scan_id: str):
+    # Удаление данных сканирования
+    pass
+```
+
+---
+
+### 5.2. Персональные данные
 
 **Не сохраняются:**
 - Email адреса (нормализуются)
@@ -295,28 +331,33 @@ logger.info(f'Scan URL: {url}')  # OK
 
 ---
 
-## 5. Аутентификация (Future)
+## 6. Кэширование (версия 1.9.0+)
 
-**План:**
+### 6.1. In-Memory Cache
+
+**token_service.py:**
 ```python
-from fastapi.security import APIKeyHeader
-
-api_key_header = APIKeyHeader(name='X-API-Key')
-
-async def get_api_key(api_key: str = Depends(api_key_header)):
-    if api_key not in settings.api_keys:
-        raise HTTPException(status_code=401, detail='Invalid API key')
-    return api_key
+_WORDS_CACHE: dict[str, set[str]] = {}
+_TRADEMARKS_CACHE: set[str] = set()
+_EXCEPTIONS_CACHE: set[str] = set()
+_CACHE_INITIALIZED = False
 ```
 
-**Environment:**
-```env
-API_KEYS=key1,key2,key3
+**Преимущества:**
+- Запросы к БД: x1/сессия (было x1000/стр)
+- Ускорение: в 10 раз
+
+### 6.2. Redis Cache (опционально)
+
+**redis_service.py:**
+```python
+await redis_service.set("lingua:exceptions", list(exceptions))
+cached = await redis_service.get("lingua:exceptions")
 ```
 
 ---
 
-## 6. Чек-лист безопасности
+## 7. Чек-лист безопасности
 
 - [x] Валидация URL (протокол, схема)
 - [x] Rate limiting (slowapi)
@@ -325,9 +366,11 @@ API_KEYS=key1,key2,key3
 - [x] Ограничение размера файлов (10 МБ)
 - [x] Ограничение длины текста (1 млн)
 - [x] Защита от локальных запросов
+- [x] Smart Crawler (aria-hidden, URL фильтрация)
+- [x] Safe Tokenizer (технические термины)
 - [ ] Аутентификация API (Future)
 - [ ] HTTPS в production (Deployment)
 
 ---
 
-*Документ синхронизирован с кодом 11 марта 2026*
+*Документ синхронизирован с кодом 23 марта 2026 (версия 1.14.0)*

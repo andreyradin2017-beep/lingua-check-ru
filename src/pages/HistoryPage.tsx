@@ -233,8 +233,20 @@ export default function HistoryPage() {
             />
           ) : (
             <>
-              <Box style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                <Table verticalSpacing="md" highlightOnHover style={{ minWidth: 600 }}>
+              <Box 
+                className="table-wrapper"
+                style={{ 
+                  overflowX: 'auto', 
+                  WebkitOverflowScrolling: 'touch',
+                  marginBottom: 0
+                }}
+              >
+                <Table 
+                  verticalSpacing="md" 
+                  highlightOnHover 
+                  style={{ minWidth: '100%' }}
+                  className="violations-table-desktop"
+                >
                   <Table.Thead>
                     <Table.Tr>
                       <Table.Th>Дата</Table.Th>

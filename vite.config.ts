@@ -20,10 +20,19 @@ export default defineConfig({
     chunkSizeWarningLimit: 650,  // Лимит warning (KB)
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-mantine': ['@mantine/core', '@mantine/hooks', '@mantine/notifications'],
-          'vendor-utils': ['axios', 'xlsx', 'papaparse'],
+        manualChunks(id) {
+          if (id.includes('node_modules/')) {
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
+              return 'vendor-react'
+            }
+            if (id.includes('mantine')) {
+              return 'vendor-mantine'
+            }
+            if (id.includes('axios') || id.includes('xlsx') || id.includes('papaparse')) {
+              return 'vendor-utils'
+            }
+          }
+          return undefined
         },
       },
     },
@@ -31,5 +40,9 @@ export default defineConfig({
   optimizeDeps: {
     include: ['react', 'react-dom', 'react-router-dom'],
     exclude: ['@tabler/icons-react'],  // Не оптимизировать иконки
+  },
+  // Vite 8: встроенная поддержка tsconfig paths (опционально)
+  resolve: {
+    tsconfigPaths: false,  // Включить, если используются алиасы из tsconfig
   },
 })

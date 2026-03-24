@@ -1,7 +1,7 @@
 # Deployment Guide: LinguaCheck-RU
 
-**Версия:** 1.7.0  
-**Дата обновления:** 9 марта 2026
+**Версия:** 1.15.0 (Full Stack Migration)
+**Дата обновления:** 24 марта 2026
 
 ---
 
@@ -58,28 +58,25 @@ flowchart TB
 
 ### 3.1. Предварительные требования
 
-**Node.js:**
-
+**Node.js (для Vite 8):**
 ```bash
-# Проверка версии
-node --version  # Требуется: 18+
+# Проверка версии (требуется 20.19+)
+node --version
 
 # Установка (Windows)
 winget install OpenJS.NodeJS.LTS
 ```
 
 **Python:**
-
 ```bash
-# Проверка версии
-python --version  # Требуется: 3.12+
+# Проверка версии (требуется 3.12+)
+python --version
 
 # Установка (Windows)
 winget install Python.Python.3.12
 ```
 
 **Playwright:**
-
 ```bash
 pip install playwright
 playwright install chromium
@@ -108,12 +105,11 @@ cp .env.example .env
 # Редактирование .env
 # VITE_API_URL=http://127.0.0.1:8000
 
-# Запуск dev-сервера
+# Запуск dev-сервера (Vite 8)
 npm run dev
 ```
 
 **Проверка:**
-
 - Открыть http://localhost:5173
 - Должна отобразиться главная страница
 
@@ -143,7 +139,6 @@ cp .env.example .env  # Linux/macOS
 ```
 
 **Миграции и настройка БД:**
-
 ```bash
 python manage.py init
 python manage.py seed
@@ -151,13 +146,11 @@ python manage.py update-counts
 ```
 
 **Запуск:**
-
 ```bash
 python run.py
 ```
 
 **Проверка:**
-
 - Открыть http://127.0.0.1:8000/docs
 - Должен отобразиться Swagger UI
 
@@ -168,7 +161,6 @@ python run.py
 ### 4.1. Docker Compose
 
 **docker-compose.yml:**
-
 ```yaml
 version: "3.8"
 
@@ -211,13 +203,11 @@ volumes:
 ```
 
 **Запуск:**
-
 ```bash
 docker-compose up -d
 ```
 
 **Проверка:**
-
 ```bash
 docker-compose ps
 docker-compose logs -f
@@ -228,7 +218,6 @@ docker-compose logs -f
 ### 4.2. Frontend Dockerfile
 
 **Dockerfile.frontend:**
-
 ```dockerfile
 FROM node:20-alpine AS builder
 
@@ -248,7 +237,6 @@ CMD ["nginx", "-g", "daemon off;"]
 ```
 
 **nginx.conf:**
-
 ```nginx
 server {
     listen 80;
@@ -273,7 +261,6 @@ server {
 ### 4.3. Backend Dockerfile
 
 **backend/Dockerfile:**
-
 ```dockerfile
 FROM python:3.12-slim
 
@@ -332,18 +319,17 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 | `SUPABASE_KEY`     | Supabase service role key       | ✅                      |
 | `CORS_ORIGINS`     | Comma-separated allowed origins | `http://localhost:5173` |
 | `MAX_DEPTH_LIMIT`  | Макс. глубина сканирования      | `5`                     |
-| `MAX_PAGES_LIMIT`  | Макс. страниц                   | `500`                   |
+| `MAX_PAGES_LIMIT`  | Макс. страниц                   | `1000`                  |
 | `MAX_FILE_SIZE_MB` | Макс. размер файла              | `10`                    |
 
 **Пример .env:**
-
 ```env
 DATABASE_URL=postgresql+asyncpg://user:password@host:5432/dbname
 SUPABASE_URL=https://abcdefgh.supabase.co
 SUPABASE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 MAX_DEPTH_LIMIT=5
-MAX_PAGES_LIMIT=500
+MAX_PAGES_LIMIT=1000
 MAX_FILE_SIZE_MB=10
 ```
 
@@ -386,13 +372,11 @@ curl http://localhost:8000/api/v1/health
 ### 7.2. Логи
 
 **Frontend:**
-
 ```bash
 docker-compose logs frontend
 ```
 
 **Backend:**
-
 ```bash
 docker-compose logs backend
 ```
@@ -414,7 +398,6 @@ docker-compose logs backend
 **Проблема:** `Error: listen EADDRINUSE: address already in use :::5173`
 
 **Решение:**
-
 ```bash
 # Найти процесс на порту 5173
 netstat -ano | findstr :5173
@@ -433,7 +416,6 @@ npm run dev -- --port 5174
 **Проблема:** `could not connect to server`
 
 **Решение:**
-
 1. Проверить DATABASE_URL в .env
 2. Проверить доступность PostgreSQL
 3. Проверить firewall правила
@@ -450,7 +432,6 @@ psql "postgresql://user:pass@host:5432/dbname"
 **Проблема:** `Executable doesn't exist at /path/to/chromium`
 
 **Решение:**
-
 ```bash
 playwright install chromium
 playwright install-deps chromium
@@ -458,10 +439,26 @@ playwright install-deps chromium
 
 ---
 
+### 8.4. Vite 8 ошибки сборки
+
+**Проблема:** `manualChunks is not a function`
+
+**Решение:** Использовать функциональную форму в Vite 8:
+```typescript
+// vite.config.ts
+manualChunks(id) {
+  if (id.includes('node_modules/')) {
+    // logic
+  }
+  return undefined
+}
+```
+
+---
+
 ## 9. CI/CD (GitHub Actions)
 
 **.github/workflows/ci.yml:**
-
 ```yaml
 name: CI
 
@@ -514,4 +511,4 @@ jobs:
 
 ---
 
-_Документ синхронизирован с кодом 9 марта 2026_
+_Документ синхронизирован с кодом 23 марта 2026 (версия 1.14.0)_

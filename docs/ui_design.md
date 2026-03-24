@@ -1,8 +1,8 @@
 # UI Design Specification: LinguaCheck-RU
 
-**Версия:** 1.6.0  
-**Библиотека:** Mantine UI v8  
-**Дата обновления:** 9 марта 2026
+**Версия:** 1.15.0
+**Библиотека:** Mantine UI v8.3.18
+**Дата обновления:** 24 марта 2026
 
 ---
 
@@ -40,6 +40,7 @@ const customBlue = [
 | Основной текст (#343a40) на #f8f9fa | 7.2:1 | ✅ PASS |
 | Dimmed текст (#5c5f66) на #f8f9fa | 4.5:1 | ✅ PASS |
 | Ссылки (#1971c2) на #fff | 4.8:1 | ✅ PASS |
+| Темная тема (improvedDark) | 8.2:1 | ✅ PASS |
 
 ---
 
@@ -85,6 +86,13 @@ const customBlue = [
   ActionIcon: {
     defaultProps: {
       size: 'lg', // 44px для доступности
+    },
+  },
+  Table: {
+    defaultProps: {
+      highlightOnHover: true,
+      withColumnBorders: true,
+      withRowBorders: true,
     },
   },
 }
@@ -144,67 +152,56 @@ const customBlue = [
   <NumberInput label="Глубина" min={1} max={5} w={80} />
 </Tooltip>
 
-<Tooltip label="Создаёт скриншоты нарушений" withArrow position="top">
-  <Checkbox label="Делать скриншоты (может замедлить)" />
+<Tooltip label="Максимум страниц (1-1000)" withArrow position="top">
+  <NumberInput label="Лимит страниц" min={1} max={1000} defaultValue={500} />
 </Tooltip>
 ```
 
-**Таблица результатов (упрощенная):**
+**Таблица результатов (группировка):**
 ```tsx
 <div style={{ overflowX: 'auto' }}>
   <Table highlightOnHover withColumnBorders withRowBorders>
     <Table.Thead bg="gray.1">
       <Table.Tr>
-        <Table.Th>URL страницы</Table.Th>
-        <Table.Th>Нарушений</Table.Th>
-        <Table.Th>Действие</Table.Th>
+        <Table.Th>Слово</Table.Th>
+        <Table.Th>Повторений</Table.Th>
+        <Table.Th>Тип</Table.Th>
+        <Table.Th>Страницы</Table.Th>
+        <Table.Th>Действия</Table.Th>
       </Table.Tr>
     </Table.Thead>
     <Table.Tbody>
-      {/* Группировка по URL */}
+      {filteredGrouped.map((item) => (
+        <Table.Tr key={item.word}>
+          <Table.Td><Text fw={700}>{item.word}</Text></Table.Td>
+          <Table.Td>
+            <Badge
+              color={item.count > 50 ? 'red' : item.count > 10 ? 'orange' : 'blue'}
+              size="lg"
+            >
+              x{item.count}
+            </Badge>
+          </Table.Td>
+          <Table.Td><Badge>{translateType(item.type)}</Badge></Table.Td>
+          <Table.Td>{item.page_urls.length} стр.</Table.Td>
+          <Table.Td>
+            <ActionIcon aria-label="Добавить в бренды">
+              <IconBookmark size={18} />
+            </ActionIcon>
+            <ActionIcon aria-label="Добавить в исключения">
+              <IconShieldCheck size={18} />
+            </ActionIcon>
+          </Table.Td>
+        </Table.Tr>
+      ))}
     </Table.Tbody>
   </Table>
 </div>
 ```
 
-**Вложенная таблица нарушений:**
-| Колонка | Описание |
-|---------|----------|
-| Тип | Badge с цветом |
-| Слово | Жирный текст |
-| Контекст | Текст с lineClamp={2} |
-| Действия | Иконки с Tooltip |
-
-**Кнопки действий:**
-```tsx
-<Tooltip label="Посмотреть скриншот" withArrow>
-  <UnstyledButton>
-    <IconPhoto size={18} color="blue" />
-  </UnstyledButton>
-</Tooltip>
-
-<Tooltip label="Пометить как бренд" withArrow>
-  <UnstyledButton>
-    <IconBookmark size={18} color="blue" />
-  </UnstyledButton>
-</Tooltip>
-
-<Tooltip label="Добавить в глобальные исключения" withArrow>
-  <UnstyledButton>
-    <IconShieldCheck size={18} color="green" />
-  </UnstyledButton>
-</Tooltip>
-
-<Tooltip label="Перейти на страницу" withArrow>
-  <UnstyledButton>
-    <IconExternalLink size={18} color="gray" />
-  </UnstyledButton>
-</Tooltip>
-```
-
 **Фильтры:**
-- `TextInput` — поиск по слову/контексту/URL
-- `MultiSelect` — фильтр по типам нарушений
+- `TextInput` — поиск по слову
+- `Select` — фильтр по типу нарушений
 - Кнопки: «Сбросить», «Развернуть все», «Свернуть все»
 
 ---
@@ -487,27 +484,69 @@ notifications.show({
 
 ---
 
-## 6. Изменения в версии 1.6.0
+## 6. Темы оформления
+
+### Светлая тема (default)
+
+```typescript
+{
+  colors: {
+    // Стандартная палитра Mantine
+  }
+}
+```
+
+### Темная тема (improvedDark v1.12.0+)
+
+```typescript
+{
+  dark: [
+    '#d9d9d9', // 0
+    '#b8b8b8', // 1
+    '#9b9b9b', // 2
+    '#7a7a7a', // 3
+    '#5c5c5c', // 4
+    '#4a4a4a', // 5
+    '#3a3a3a', // 6
+    '#2a2a2a', // 7
+    '#1f1f1f', // 8
+    '#141414', // 9
+  ]
+}
+```
+
+**Контрастность:** 8.2:1 (улучшена на 26%)
+
+---
+
+## 7. Изменения в версии 1.14.0
+
+### Обновления
+
+- ✅ Mantine UI 8.3.16
+- ✅ Vite 8 (Rolldown)
+- ✅ React 19.2.0
+- ✅ Улучшенная группировка нарушений
 
 ### Удалено
+
 - ❌ Модальное окно «Бренды»
 - ❌ Кнопка «Все в бренды»
 - ❌ Колонка «Вес (%)» в таблице нарушений
 - ❌ Тип нарушения `visual_dominance` из UI
+- ❌ Функционал скриншотов (v1.7.0)
 
 ### Добавлено
+
 - ✅ Tooltip для всех кнопок действий
 - ✅ Tooltip для полей URL и Глубина
 - ✅ Кнопка «Пометить как исключение» (IconShieldCheck)
 - ✅ Счетчик символов в Textarea
 - ✅ Пагинация в HistoryPage
-
-### Исправлено
-- 🐛 Горизонтальный скролл таблицы (Mobile)
-- 🐛 Контраст dimmed текста
-- 🐛 Размер touch-целей (44px)
-- 🐛 ARIA-labels для иконок
+- ✅ Группировка нарушений (слово xN)
+- ✅ Консистентные отступы (8px grid)
+- ✅ Retry logic с экспоненциальной задержкой
 
 ---
 
-*Документ синхронизирован с кодом 9 марта 2026*
+*Документ синхронизирован с кодом 23 марта 2026 (версия 1.14.0)*

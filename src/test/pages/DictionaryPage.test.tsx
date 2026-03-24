@@ -7,13 +7,12 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { MantineProvider } from '@mantine/core';
-import { theme } from '../../theme';
 import DictionaryPage from '../../pages/DictionaryPage';
 
 // Mock axios
 vi.mock('axios', () => {
   const mock = {
-    get: vi.fn(() => Promise.resolve({ 
+    get: vi.fn(() => Promise.resolve({
       data: {
         dictionary_versions: [
           { name: 'Orthographic', version: '1.0', word_count: 100000 },
@@ -21,7 +20,7 @@ vi.mock('axios', () => {
         ],
       }
     })),
-    create: vi.fn(function(this: any) { return this; }),
+    create: vi.fn(function(this: unknown) { return this; }),
     interceptors: {
       request: { use: vi.fn(), eject: vi.fn() },
       response: { use: vi.fn(), eject: vi.fn() },
@@ -33,7 +32,7 @@ vi.mock('axios', () => {
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <MemoryRouter>
-    <MantineProvider theme={theme}>{children}</MantineProvider>
+    <MantineProvider>{children}</MantineProvider>
   </MemoryRouter>
 );
 

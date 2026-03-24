@@ -7,7 +7,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { MantineProvider } from '@mantine/core';
-import { theme } from '../../theme';
 import TextPage from '../../pages/TextPage';
 
 // Mock axios
@@ -15,7 +14,7 @@ vi.mock('axios', () => {
   const mock = {
     get: vi.fn(() => Promise.resolve({ data: { summary: { total_tokens: 0, violations_count: 0, compliance_percent: 100 }, violations: [] } })),
     post: vi.fn(() => Promise.resolve({ data: { summary: { total_tokens: 0, violations_count: 0, compliance_percent: 100 }, violations: [] } })),
-    create: vi.fn(function(this: any) { return this; }),
+    create: vi.fn(function(this: unknown) { return this; }),
     interceptors: {
       request: { use: vi.fn(), eject: vi.fn() },
       response: { use: vi.fn(), eject: vi.fn() },
@@ -34,7 +33,7 @@ vi.mock('@mantine/notifications', () => ({
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <MemoryRouter>
-    <MantineProvider theme={theme}>{children}</MantineProvider>
+    <MantineProvider>{children}</MantineProvider>
   </MemoryRouter>
 );
 

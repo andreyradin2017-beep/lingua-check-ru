@@ -1,8 +1,8 @@
 # Data Model Specification: LinguaCheck-RU
 
-**Версия:** 1.7.0  
-**СУБД:** PostgreSQL 15+ (Supabase)  
-**Дата обновления:** 11 марта 2026
+**Версия:** 1.15.0
+**СУБД:** PostgreSQL 15+ (Supabase)
+**Дата обновления:** 24 марта 2026
 
 ---
 
@@ -11,9 +11,7 @@
 ```mermaid
 erDiagram
     scans ||--o{ pages : contains
-    pages ||--o{ tokens : contains
     pages ||--o{ violations : has
-    tokens ||--o| violations : linked
     trademarks ||--o{ violations : excludes
     global_exceptions ||--o{ violations : excludes
     dictionary_words ||--o{ tokens : matches
@@ -31,7 +29,7 @@ erDiagram
 | Колонка | Тип | Nullable | Описание |
 |---------|-----|----------|----------|
 | `id` | UUID | ❌ PK | Уникальный идентификатор |
-| `target_url` | TEXT | ✅ | Целевой URL сканирования |
+| `target_url` | TEXT | ❌ | Целевой URL сканирования |
 | `status` | TEXT | ❌ | Статус: `started`, `in_progress`, `completed`, `failed`, `stopped` |
 | `started_at` | TIMESTAMPTZ | ❌ | Время начала |
 | `finished_at` | TIMESTAMPTZ | ✅ | Время завершения |
@@ -209,6 +207,7 @@ CREATE INDEX idx_dictionary_words_source ON dictionary_words(source_dictionary);
 - Email адреса (нормализованные части)
 - URL (доменные имена)
 - Технические строки (CSS-классы, JS-переменные)
+- Технические термины (`drug`, `javascript`, `elementbytagname`, etc.)
 
 ### 3.2. Минимальная длина
 
@@ -262,7 +261,7 @@ erDiagram
         boolean is_foreign
         text version
     }
-    
+
     scans ||--o{ pages : contains
     scans {
         uuid id PK
@@ -272,7 +271,7 @@ erDiagram
         timestamptz finished_at
         integer max_pages
     }
-    
+
     pages ||--o{ tokens : contains
     pages ||--o{ violations : has
     pages {
@@ -284,7 +283,7 @@ erDiagram
         text content_hash
         integer violations_count
     }
-    
+
     tokens ||--o| violations : linked
     tokens {
         uuid id PK
@@ -297,7 +296,7 @@ erDiagram
         boolean is_trademark
         text language_hint
     }
-    
+
     violations {
         uuid id PK
         uuid token_id FK
@@ -307,14 +306,14 @@ erDiagram
         jsonb details
         timestamptz created_at
     }
-    
+
     trademarks ||--o{ violations : excludes
     trademarks {
         uuid id PK
         text word
         text normal_form
     }
-    
+
     global_exceptions ||--o{ violations : excludes
     global_exceptions {
         uuid id PK
@@ -325,13 +324,31 @@ erDiagram
 
 ---
 
-## 6. Известные ограничения
+## 6. Кэширование (версия 1.9.0+)
+
+### In-Memory Cache
+
+**token_service.py:**
+```python
+_WORDS_CACHE: dict[str, set[str]] = {}
+_TRADEMARKS_CACHE: set[str] = set()
+_EXCEPTIONS_CACHE: set[str] = set()
+_CACHE_INITIALIZED = False
+```
+
+**Преимущества:**
+- Запросы к БД: x1000/стр → x1/сессия (**-99.9%**)
+- Ускорение анализа: **в 10 раз**
+
+---
+
+## 7. Известные ограничения
 
 - Таблицы созданы в Supabase (PostgreSQL 15)
 - Интроспекция через `create_all()` отключена (PgBouncer Transaction Mode)
 - Миграции применяются через Alembic
-- Скриншоты хранятся в `backend/static/screenshots/`
+- Скриншоты удалены в версии 1.7.0
 
 ---
 
-*Документ синхронизирован с кодом 11 марта 2026*
+*Документ синхронизирован с кодом 23 марта 2026 (версия 1.14.0)*

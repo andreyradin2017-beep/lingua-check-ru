@@ -56,6 +56,19 @@ export const theme: MantineThemeOverride = createTheme({
       styles: {
         root: {
           transition: 'transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease',
+          // Минимальная высота для доступности (WCAG 2.1 - 44px для тача)
+          minHeight: 'var(--button-min-height, unset)',
+        },
+      },
+    },
+    ActionIcon: {
+      defaultProps: {
+        radius: 'md',
+      },
+      styles: {
+        root: {
+          minHeight: 'var(--button-min-height, unset)',
+          minWidth: 'var(--button-min-height, unset)',
         },
       },
     },

@@ -7,12 +7,11 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { MantineProvider } from '@mantine/core';
-import { theme } from '../../theme';
 import NotFoundPage from '../../pages/NotFoundPage';
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <MemoryRouter>
-    <MantineProvider theme={theme}>{children}</MantineProvider>
+    <MantineProvider>{children}</MantineProvider>
   </MemoryRouter>
 );
 

@@ -1,10 +1,16 @@
 # 🚀 Деплой на Render.com (Бесплатно)
 
+**Версия:** 1.15.0
+**Дата обновления:** 24 марта 2026
+
+---
+
 ## 📋 Требования
 
 - Аккаунт на [Render.com](https://render.com)
 - PostgreSQL база (Supabase или Render PostgreSQL)
 - Git репозиторий
+- Node.js 20.19+ (для Vite 8)
 
 ---
 
@@ -98,7 +104,7 @@ VITE_API_URL=https://your-app-name.onrender.com
 
 **Или обновите src/config/api.ts:**
 ```typescript
-export const API_URL = import.meta.env.VITE_API_URL || 
+export const API_URL = import.meta.env.VITE_API_URL ||
   'https://your-app-name.onrender.com';
 ```
 
@@ -113,7 +119,7 @@ export const API_URL = import.meta.env.VITE_API_URL ||
 curl https://your-app-name.onrender.com/api/v1/health
 
 # Ожидается:
-# {"status":"ok","database":"ok","mode":"rest_api"}
+# {"status":"healthy"}
 ```
 
 ### Проверка Frontend
@@ -183,6 +189,10 @@ CORS_ORIGINS=["*"]
 - Render передает PORT через переменную
 - Убедитесь что `host="0.0.0.0"`
 
+**5. Vite 8 ошибки сборки:**
+- Требуется Node.js 20.19+
+- Проверьте `manualChunks` в vite.config.ts
+
 ---
 
 ## 📊 Мониторинг
@@ -223,5 +233,5 @@ CORS_ORIGINS=["*"]
 
 ---
 
-**Последнее обновление:** 14 марта 2026  
-**Версия:** 1.11.0
+**Последнее обновление:** 23 марта 2026  
+**Версия:** 1.14.0 (Vite 8 Migration)

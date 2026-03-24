@@ -8,8 +8,8 @@ Object.defineProperty(window, 'matchMedia', {
     matches: false,
     media: query,
     onchange: null,
-    addListener: vi.fn(), // deprecated
-    removeListener: vi.fn(), // deprecated
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
     dispatchEvent: vi.fn(),
@@ -35,4 +35,25 @@ vi.mock('axios', () => ({
       response: { use: vi.fn(), eject: vi.fn() },
     },
   },
+}));
+
+// Mock react-router-dom
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom');
+  return {
+    ...(actual as object),
+    useNavigate: vi.fn(() => vi.fn()),
+    useSearchParams: vi.fn(() => [vi.fn(), vi.fn()]),
+    useParams: vi.fn(() => ({})),
+  };
+});
+
+// Mock @mantine/notifications
+vi.mock('@mantine/notifications', () => ({
+  notifications: {
+    show: vi.fn(),
+    hide: vi.fn(),
+    update: vi.fn(),
+  },
+  Notifications: vi.fn(() => null),
 }));
